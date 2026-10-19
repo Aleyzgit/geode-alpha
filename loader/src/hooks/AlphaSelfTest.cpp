@@ -1,8 +1,10 @@
 #include <Geode/loader/GameEvent.hpp>
 #include <Geode/loader/Loader.hpp>
 #include <Geode/loader/Mod.hpp>
+#include <Geode/loader/Hook.hpp>
 #include <Geode/binding/AppDelegate.hpp>
 #include <Geode/binding/GameManager.hpp>
+#include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/binding/LocalLevelManager.hpp>
 #include <ui/mods/settings/SettingNodeV3.hpp>
 
@@ -51,6 +53,27 @@ $on_game(Loaded) {
         !Loader::get()->getLaunchFlag("private-self-test")) return;
 
 #ifdef GEODE_IS_WINDOWS
+    auto missingHook = Hook::create(
+        reinterpret_cast<void*>(geode::base::get() + 0x9999999),
+        +[] {}, "Alpha unresolved binding test",
+        tulip::hook::TulipConvention::Default
+    );
+    auto missingResult = missingHook->enable();
+    log::info("[ALPHA TEST] Unresolved hook rejected: {}",
+        missingResult.isErr() && !missingHook->isEnabled() ? "PASS" : "FAIL");
+
+    // Use a temporary level; no player progress is changed by this check.
+    auto level = GJGameLevel::create();
+    bool levelValid = false;
+    if (level) {
+        level->savePercentage(37, false, 12, 4, false);
+        level->savePercentage(79, true, 0, 0, false);
+        levelValid = level->m_normalPercent.value() == 37 &&
+            level->m_practicePercent == 79 && level->m_clicks.value() == 12;
+    }
+    log::info("[ALPHA TEST] Native level progress layout: {}",
+        levelValid ? "PASS" : "FAIL");
+
     auto manager = GameManager::get();
     std::string key = "gv_geode-alpha-binding-test";
     Ref<CCObject> previous = manager->m_valueKeeper->objectForKey(key);

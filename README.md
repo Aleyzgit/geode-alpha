@@ -62,8 +62,11 @@ The mod catalog, modal popup input, mod-data save hooks, GLFW error handlers,
 Windows font imports and shutdown-thread location have been updated.
 The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
-Three Windows binding placeholders have been resolved; **191 remain** in the
-pinned bindings. Unsupported methods cannot be used or hooked reliably.
+The GJGameLevel layout and editor build statistics now use the newer upstream
+bindings, including corrected level-browser, slider and secret-level methods.
+Three Windows binding placeholders have been resolved; **209 remain** across
+the pinned game and engine declarations (191 game and 18 engine addresses).
+Unsupported hooks report an error instead of claiming successful activation.
 Native class layouts and SDK interfaces also change between versions.
 
 To include mods targeting other GD/Geode versions in the catalog and allow
@@ -73,11 +76,13 @@ convert old DLLs. Some mods need to be rebuilt or ported by their authors.
 Platform checks and package hash checks remain enabled.
 
 Build with Clang and the normal upstream CMake workflow. Bindings are pinned
-to `36597386d044d2e13fced37885a19d2d08df50d3`; the fork's verified native
+to `cac7b26495124025212d0f5e4cf82bb43b8162e8`; the fork's verified native
 address corrections are applied in the build directory. To reject a build
 while Windows placeholders remain, configure with
 `-DGEODE_ALPHA_REQUIRE_COMPLETE_BINDINGS=ON`. This check is expected to fail
-until the remaining native bindings have been ported.
+until the remaining native bindings have been ported. It also checks custom
+`GEODE_BINDINGS_PATH` directories and the engine declarations. Passing this
+address check alone does not prove mod or class-layout compatibility.
 
 Loader auto-updates are disabled by default. Use the resources produced by
 the same build as the loader. Run the optional runtime checks with
@@ -86,8 +91,9 @@ experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
 Windows validation used Clang 21.1.8. Runtime checks passed for settings,
-version gates, platform rejection, native integer variables and local-level
-access in both compatibility modes. The native save path persisted a test
+version gates, platform rejection, native integer variables, local-level
+access, native level progress and rejection of unresolved hooks in both
+compatibility modes. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its
 unchanged C++ source against this SDK and loaded its window hook successfully.
 Its published Geode 5 DLL cannot load unchanged because it imports three

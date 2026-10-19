@@ -49,20 +49,11 @@ Result<> Hook::Impl::enable() {
         return Ok();
     }
 
-    // During a transition between updates when it's important to get a
-    // non-functional version that compiles, address 0x9999999 is used to mark
-    // functions not yet RE'd but that would prevent compilation
+    // Placeholder bindings cannot install a hook. Propagate the failure so
+    // callers do not treat an inactive hook as successfully enabled.
     if ((uintptr_t)m_address == (geode::base::get() + 0x9999999)) {
-        if (m_owner) {
-            log::warn(
-                "Hook {} for {} uses placeholder address, refusing to hook",
-                m_displayName, m_owner->getID()
-            );
-        }
-        else {
-            log::warn("Hook {} uses placeholder address, refusing to hook", m_displayName);
-        }
-        return Ok();
+        return Err("Cannot enable hook {}: native binding is unresolved "
+            "for this game version", m_displayName);
     }
 
     GEODE_UNWRAP_INTO(auto handler, LoaderImpl::get()->getOrCreateHandler(m_address, m_handlerMetadata));
