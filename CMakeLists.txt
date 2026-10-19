@@ -85,7 +85,7 @@ if (NOT GEODE_BINDINGS_REPO_PATH)
 	)
 	CPMAddPackage(NAME "bindings"
 		GITHUB_REPOSITORY "geode-sdk/bindings"
-		GIT_TAG "main"
+		GIT_TAG "36597386d044d2e13fced37885a19d2d08df50d3"
 		DOWNLOAD_ONLY YES
 		NO_CACHE YES
 	)
@@ -261,7 +261,12 @@ set(MAT_JSON_AS_INTERFACE ON)
 CPMAddPackage("gh:geode-sdk/result@1.4.1")
 CPMAddPackage("gh:geode-sdk/json@3.3.1")
 CPMAddPackage("gh:geode-sdk/nontype_functional#6d1d08c")
-CPMAddPackage("gh:fmtlib/fmt#12.2.0")
+# The SDK uses headers, including when consumed by a C++23 mod.
+CPMAddPackage(NAME fmt
+	GITHUB_REPOSITORY fmtlib/fmt
+	GIT_TAG 12.2.0
+	OPTIONS "FMT_MODULE OFF"
+)
 
 # allow overriding asp / arc versions
 if (NOT DEFINED GEODE_ARC_VERSION)
@@ -339,6 +344,7 @@ endif()
 
 target_sources(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/entry.cpp)
 
+include(cmake/AlphaBindings.cmake)
 add_subdirectory(${GEODE_BINDINGS_REPO_PATH} ${CMAKE_BINARY_DIR}/bindings)
 
 if (NOT GEODE_DISABLE_PRECOMPILED_HEADERS)
