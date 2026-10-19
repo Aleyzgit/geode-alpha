@@ -1,6 +1,6 @@
 #include <Geode/ui/ScrollLayer.hpp>
 #include <Geode/utils/cocos.hpp>
-#include <Geode/cocos/platform/win32/CCEGLView.h>
+#include <Geode/cocos/include/cocos2d.h>
 #include <Geode/cocos/touch_dispatcher/CCTouchHandler.h>
 #include <Geode/ui/SimpleAxisLayout.hpp>
 
