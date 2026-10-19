@@ -79,15 +79,15 @@ Popup::~Popup() {
 }
 
 void Popup::registerWithTouchDispatcher() {
-    CCTouchDispatcher::get()->addTargetedDelegate(this, -500, true);
+    CCTouchDispatcher::get()->addTargetedDelegate(this, -501, true);
 }
 
 bool Popup::init(
     float width, float height, char const* bg, CCRect bgRect
 ) {
     m_size = CCSize{ width, height };
-    // TODO: 2.209
-    // CCTouchDispatcher::get()->registerForcePrio(this, 2);
+    // Own a modal touch level, matching the 2.2091 alert layers.
+    CCTouchDispatcher::get()->registerForcePrio(this, 2, 1);
 
     if (!this->initWithColor({ 0, 0, 0, 105 })) return false;
 

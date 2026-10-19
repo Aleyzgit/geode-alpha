@@ -91,12 +91,19 @@ $on_game(Exiting) {
     // ...
     // _DAT_1801a8530 = uVar4;  <-- this is the address we want!
 
-#if GEODE_COMP_GD_VERSION != 22081
+#if GEODE_COMP_GD_VERSION == 22091
+    constexpr uintptr_t threadOffset = 0x1b2560;
+#elif GEODE_COMP_GD_VERSION == 22081
+    constexpr uintptr_t threadOffset = 0x1a8530;
+#else
     #pragma message("Unsupported GD version!")
+    constexpr uintptr_t threadOffset = 0;
     return;
 #endif
 
-    auto addr = reinterpret_cast<void*>(geode::base::getCocos() + 0x1a8530);
+    auto addr = reinterpret_cast<void*>(
+        geode::base::getCocos() + threadOffset
+    );
     auto thread = reinterpret_cast<std::thread*>(addr);
     if (thread->joinable()) thread->detach();
 }

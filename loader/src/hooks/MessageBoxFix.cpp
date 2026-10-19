@@ -40,10 +40,16 @@ $execute {
     // hook them to call our own handler
     if (LoaderImpl::get()->isForwardCompatMode()) return;
 
-#if GEODE_COMP_GD_VERSION == 22081
+#if GEODE_COMP_GD_VERSION == 22091
+    constexpr uintptr_t offset1 = 0x7a480;
+    constexpr uintptr_t offset2 = 0x7a4e0;
+#elif GEODE_COMP_GD_VERSION == 22081
     const uintptr_t offset1 = 0x77700; // member function in CCEGLView
     const uintptr_t offset2 = 0x77760; // static function
 
+#endif
+
+#if GEODE_COMP_GD_VERSION == 22091 || GEODE_COMP_GD_VERSION == 22081
     (void) Mod::get()->hook(
         reinterpret_cast<void*>(geode::base::getCocos() + offset1),
         fixedErrorHandler,

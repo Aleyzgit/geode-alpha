@@ -35,10 +35,27 @@ static void patchCall(uintptr_t addr, uintptr_t newCall) {
     (void)Mod::get()->patch(reinterpret_cast<void*>(addr), patch);
 }
 
+static void patchFontImport(uintptr_t offset, uintptr_t replacement) {
+    ByteVector bytes;
+    for (size_t index = 0; index < sizeof(replacement); ++index) {
+        bytes.push_back(replacement >> (8 * index));
+    }
+    auto result = Mod::get()->patch(
+        reinterpret_cast<void*>(geode::base::getCocos() + offset), bytes
+    );
+    if (result.isErr()) {
+        log::warn("Unable to patch font import: {}", result.unwrapErr());
+    }
+}
+
 $execute {
     if (LoaderImpl::get()->isForwardCompatMode()) return;
 
-#if GEODE_COMP_GD_VERSION == 22040
+#if GEODE_COMP_GD_VERSION == 22091
+    // Patch cocos imports, covering both setFont and BitmapDC destruction.
+    patchFontImport(0xea080, (uintptr_t)&RemoveFontResourceWHook);
+    patchFontImport(0xea0c0, (uintptr_t)&AddFontResourceWHook);
+#elif GEODE_COMP_GD_VERSION == 22040
     // BitmapDC::~BitmapDC
     patchCall(0xC9A56, (uintptr_t)&RemoveFontResourceWHook);
 
