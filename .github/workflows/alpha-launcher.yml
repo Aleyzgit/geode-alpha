@@ -1,0 +1,23 @@
+name: Alpha Windows launcher
+
+on:
+  push:
+    paths:
+      - 'installer/windows/*Alpha*.ps1'
+      - '.github/workflows/alpha-launcher.yml'
+  pull_request:
+    paths:
+      - 'installer/windows/*Alpha*.ps1'
+      - '.github/workflows/alpha-launcher.yml'
+
+jobs:
+  launcher:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Windows PowerShell 5.1
+        shell: powershell
+        run: ./installer/windows/Test-AlphaLauncher.ps1
+      - name: PowerShell 7
+        shell: pwsh
+        run: ./installer/windows/Test-AlphaLauncher.ps1

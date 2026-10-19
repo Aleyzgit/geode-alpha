@@ -100,6 +100,12 @@ Its published Geode 5 DLL cannot load unchanged because it imports three
 EventCenterThreadLocal exports that the v6 SDK no longer provides. This is
 one tested mod, not a general binary-compatibility guarantee.
 
+For existing Geode 5 mods, the optional [Windows runtime launcher](installer/windows/alpha-runtimes.md)
+can select a separate GD 2.2081 / official Geode 5.11.2 installation. It checks
+the configured binaries and mod manifests before launch. This provides a
+matching older game process; it does not complete the 2.2091 port or convert
+old mods into Geode 6 mods.
+
 **This fork contains code and documentation created with AI assistance.
 Geode Alpha is unofficial and is not an official Geode release or endorsed
 by the Geode team.**
