@@ -705,8 +705,10 @@ ServerFuture<ServerModsList> server::getMods(ModsQuery query, bool useCache) {
         req.param("query", *query.query);
     }
 
-    req.param("gd", GEODE_GD_VERSION_STR);
-    req.param("geode", Loader::get()->getVersion().toNonVString());
+    if (!Loader::get()->getLaunchFlag("allow-incompatible-mods")) {
+        req.param("gd", GEODE_GD_VERSION_STR);
+        req.param("geode", Loader::get()->getVersion().toNonVString());
+    }
     if (Loader::get()->isPatchless())
         req.param("jitless", "true");
 
@@ -820,14 +822,13 @@ ServerFuture<ServerModVersion> server::getModVersion(std::string id, ModVersion 
         },
     }, version);
 
+    req.param("platforms", GEODE_PLATFORM_SHORT_IDENTIFIER);
+    if (!Loader::get()->getLaunchFlag("allow-incompatible-mods")) {
+        req.param("gd", Loader::get()->getGameVersion());
+    }
     auto response = co_await req.get(
-        formatServerURL(
-            "/mods/{}/versions/{}?gd={}&platforms={}",
-            id,
-            versionURL,
-            Loader::get()->getGameVersion(),
-            GEODE_PLATFORM_SHORT_IDENTIFIER
-    ));
+        formatServerURL("/mods/{}/versions/{}", id, versionURL)
+    );
 
     if (response.ok()) {
         // Parse payload
@@ -907,8 +908,10 @@ ServerFuture<ServerModUpdateAllCheck> server::batchedCheckUpdates(std::vector<st
     auto req = web::WebRequest();
     req.userAgent(getServerUserAgent());
     req.param("platform", GEODE_PLATFORM_SHORT_IDENTIFIER);
-    req.param("gd", GEODE_GD_VERSION_STR);
-    req.param("geode", Loader::get()->getVersion().toNonVString());
+    if (!Loader::get()->getLaunchFlag("allow-incompatible-mods")) {
+        req.param("gd", GEODE_GD_VERSION_STR);
+        req.param("geode", Loader::get()->getVersion().toNonVString());
+    }
     if (Loader::get()->isPatchless())
         req.param("jitless", "true");
 

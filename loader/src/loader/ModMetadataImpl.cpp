@@ -676,6 +676,10 @@ Result<> ModMetadata::checkGameVersion() const {
             return Err(fmt::format("This mod ({}) doesn't support {}.", m_impl->m_id, GEODE_PLATFORM_NAME));
         }
 
+        if (Loader::get()->getLaunchFlag("allow-incompatible-mods")) {
+            return Ok();
+        }
+
         if (LoaderImpl::get()->isForwardCompatMode()) {
             // this means current gd version is > GEODE_GD_VERSION
             if (modTargetVer <= GEODE_GD_VERSION) {

@@ -197,7 +197,10 @@ bool ModItem::init(ModSource&& source, bool listItem) {
 
         auto geodeValid = Loader::get()->isModVersionSupported(version.getGeodeVersion());
         auto gameVersion = version.getGameVersion();
-        auto gdValid = !gameVersion || gameVersion == "*" || gameVersion == GEODE_STR(GEODE_GD_VERSION);
+        auto gdValid = !gameVersion || gameVersion == "*" ||
+            gameVersion == GEODE_STR(GEODE_GD_VERSION) ||
+            (gameVersion != "0.000" &&
+                Loader::get()->getLaunchFlag("allow-incompatible-mods"));
 
         if (!geodeValid || !gdValid) {
             spr = createGeodeButton("N/A", 50, false, true, GeodeButtonSprite::Gray);
@@ -909,7 +912,9 @@ void ModItem::onView(CCObject*) {
                 "OK", nullptr, 360
             )->show();
         }
-        if (gameVersion && gameVersion != "*" && gameVersion != GEODE_STR(GEODE_GD_VERSION)) {
+        if (gameVersion && gameVersion != "*" &&
+            gameVersion != GEODE_STR(GEODE_GD_VERSION) &&
+            !Loader::get()->getLaunchFlag("allow-incompatible-mods")) {
             return FLAlertLayer::create(
                 nullptr,
                 "Unavailable",

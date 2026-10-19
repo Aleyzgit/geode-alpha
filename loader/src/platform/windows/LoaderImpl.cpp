@@ -90,6 +90,7 @@ std::string Loader::Impl::getLaunchCommand() const {
 }
 
 bool Loader::Impl::isModVersionSupported(VersionInfo const& target) {
+    if (this->getLaunchFlag("allow-incompatible-mods")) return true;
     return semverCompare(this->getVersion(), target);
 }
 
