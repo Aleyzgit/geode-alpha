@@ -76,8 +76,6 @@ alpha_patch_address(Cocos2d cocos2d::CCLightning "void strike()" 0x485c0)
 
 # Exact instruction matches, including the constraintContent tail-call target.
 alpha_patch_address(GeometryDash CCScrollLayerExt "void constraintContent()" 0x180a90)
-alpha_patch_address(GeometryDash GJWriteMessagePopup
-    "virtual void textInputClosed(CCTextInputNode* node)" 0x1265d0)
 # Constructor installs the GooglePlayManager RTTI vtable; two mapped callers
 # and the complete 2.2081 instruction fingerprint agree on the singleton.
 alpha_patch_address(GeometryDash GooglePlayManager
@@ -517,8 +515,8 @@ alpha_patch_class(GeometryDash EditorWindowPopup
     "    virtual void onBuildWindowContent() = win 0x9999999;"
     "    inline virtual void onBuildWindowContent() = 0;")
 alpha_patch_class(GeometryDash EditorWindowPopup
-    "    TodoReturn clampWindowCenter(cocos2d::CCPoint);"
-    "    TodoReturn clampWindowCenter(cocos2d::CCPoint);\n    PAD = win 0x98;")
+    "    TodoReturn touchRect();"
+    "    TodoReturn touchRect();\n    PAD = win 0x98;")
 
 # ScrollViewPopup's native base has one retained object at 0x298, a further
 # eight bytes of state, and a pure buildContent entry at vtable offset 0x438.

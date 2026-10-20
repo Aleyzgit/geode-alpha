@@ -64,7 +64,7 @@ The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
 The GJGameLevel layout and editor build statistics now use the newer upstream
 bindings, including corrected level-browser, slider and secret-level methods.
-**73 Windows native-address placeholders remain**
+**67 Windows native-address placeholders remain**
 in the pinned game declarations. The engine declarations have no remaining
 Windows placeholders. Additional unsafe or incorrect entries have been corrected,
 including PVR functions that previously pointed outside executable memory.
@@ -84,7 +84,7 @@ convert old DLLs. Some mods need to be rebuilt or ported by their authors.
 Platform checks and package hash checks remain enabled.
 
 Build with Clang and the normal upstream CMake workflow. Bindings are pinned
-to `ae234b568310731bcf6453f846826a1e772eb6db`; the fork's verified native
+to `d6f3312f0886b2c285fd0d2593ebabdc03b6ca0c`; the fork's verified native
 address corrections are applied in the build directory. To reject a build
 while Windows placeholders remain, configure with
 `-DGEODE_ALPHA_REQUIRE_COMPLETE_BINDINGS=ON`. This check is expected to fail
@@ -120,7 +120,7 @@ Four obsolete request-cell virtual callbacks and the removed request-popup
 actions are excluded from the Windows SDK, since they have no matching native
 interface. This removal reduces the placeholder count; it does not restore
 those older APIs or establish binary compatibility with their users.
-All 5,442 populated generated wrappers point into executable
+All 5,449 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its

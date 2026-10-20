@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 73 Windows address placeholders are in
+respective modules. The remaining 67 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -17,9 +17,15 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
-`ae234b568310731bcf6453f846826a1e772eb6db`. The generated Windows build has
-5,442 populated native wrappers, all pointing into executable sections of
+`d6f3312f0886b2c285fd0d2593ebabdc03b6ca0c`. The generated Windows build has
+5,449 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
+
+The updated upstream declarations include the current gameplay-layer state
+and additional editor-window functions. Removed Windows classes such as
+EditorOptionsLayer, GameOptionsLayer and GJWriteMessagePopup are marked missing.
+This prevents their old declarations from masquerading as native Windows APIs;
+it does not port mods that depend on those interfaces.
 
 The GameLevelManager allocation is 0x690 bytes. Constructor initialization,
 the GLM serialization keys and native cache lookups establish its known field
