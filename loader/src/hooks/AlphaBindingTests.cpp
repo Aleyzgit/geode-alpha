@@ -20,9 +20,11 @@
 #include <Geode/binding/GlobalKeybindSource.hpp>
 #include <Geode/binding/GJLevelList.hpp>
 #include <Geode/binding/GJOptionsLayer.hpp>
+#include <Geode/binding/GJRequestCell.hpp>
 #include <Geode/binding/LocalLevelManager.hpp>
 #include <Geode/binding/KeybindSet.hpp>
 #include <Geode/binding/LevelUploadDelegate.hpp>
+#include <Geode/binding/LevelSearchLayer.hpp>
 #include <Geode/binding/MusicDownloadManager.hpp>
 #include <Geode/binding/OBB2D.hpp>
 #include <Geode/binding/PulseEffectAction.hpp>
@@ -54,11 +56,24 @@ static_assert(sizeof(BrowseSmartTemplateLayer) == 0x2c8);
 static_assert(sizeof(CreateGuidelinesLayer) == 0x300);
 static_assert(sizeof(SetTextPopup) == 0x2f8);
 static_assert(sizeof(MusicDownloadManager) == 0x3d0);
+static_assert(sizeof(LevelSearchLayer) == 0x1f8);
+static_assert(sizeof(GJRequestCell) == 0x248);
 static_assert(std::is_abstract_v<KeybindSource>);
 static_assert(std::is_abstract_v<CCKeyboardActionManager>);
 static_assert(std::is_abstract_v<EditorWindowPopup>);
 static_assert(std::is_abstract_v<ScrollViewPopup>);
 namespace {
+    class AlphaRequestCanary final : public GJRequestCell {
+    public:
+        std::array<uint8_t, 32> guard;
+        AlphaRequestCanary() : GJRequestCell("alpha-request-fixture", 320.f, 40.f) {
+            // Keep the old SDK's fields safe to destroy while testing its init
+            // entry. The tail absorbs writes from an incorrectly bound class.
+            std::memset(reinterpret_cast<uint8_t*>(this) + 0x230, 0, 0x18);
+            guard.fill(0xa5);
+        }
+    };
+
     class AlphaTextReceiver final : public SetTextPopupDelegate {
     public:
         SetTextPopup* popup = nullptr;
@@ -715,6 +730,34 @@ $on_game(Loaded) {
         engine->m_suspendedChannels = {717171, 717172};
         engine->resumeSuspendedAudio();
         return !engine->m_suspendedGlobalAudio && engine->m_suspendedChannels.empty();
+    });
+
+    runBindingTest("Native level search filters", [] {
+        auto layer = std::make_unique<LevelSearchLayer>();
+        auto offset = reinterpret_cast<uintptr_t>(&layer->m_difficultyDict) -
+            reinterpret_cast<uintptr_t>(layer.get());
+        if (sizeof(LevelSearchLayer) != 0x1f8 || offset != 0x1e0) return false;
+        AlphaTestField filters(layer->m_difficultyDict, CCDictionary::create());
+        layer->m_difficultyDict->setObject(CCString::create("1"), "D2");
+        layer->m_difficultyDict->setObject(CCString::create("1"), "T1");
+        auto selected = layer->checkDiff(2) && layer->checkTime(1) &&
+            !layer->checkDiff(3) && !layer->checkTime(5);
+        layer->m_difficultyDict->setObject(CCString::create("0"), "D2");
+        return selected && !layer->checkDiff(2);
+    });
+
+    runBindingTest("Native search page construction", [] {
+        auto layer = LevelSearchLayer::create(1);
+        return layer && layer->m_searchInput && layer->m_noStarsSprite &&
+            layer->m_difficultySprites && layer->m_lengthSprites && layer->m_difficultyDict &&
+            layer->m_searchInput->getParent() && layer->getChildrenCount() > 0;
+    });
+
+    runBindingTest("Native request cell boundary", [] {
+        auto cell = std::make_unique<AlphaRequestCanary>();
+        auto initialized = cell->GJRequestCell::init();
+        return initialized && std::all_of(cell->guard.begin(), cell->guard.end(),
+            [](uint8_t value) { return value == 0xa5; });
     });
 }
 #endif

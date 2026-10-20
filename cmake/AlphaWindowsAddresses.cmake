@@ -102,9 +102,6 @@ alpha_patch_address(GeometryDash EndLevelLayer
 # Calls GameObject's constructor and installs EnhancedGameObject's RTTI tables.
 alpha_patch_address(GeometryDash EnhancedGameObject
     "EnhancedGameObject()" 0x288660 0xccad0)
-# Clears the three request-cell fields at 0x248, 0x250 and 0x258, returning true.
-alpha_patch_address(GeometryDash GJRequestCell
-    "virtual bool init()" 0x15ca80 0x158d20)
 # Native factory allocates 0x328, initializes the robot animation and icon type.
 alpha_patch_address(GeometryDash GJRobotSprite
     "static GJRobotSprite* create(int frame)" 0x3ac740 0x185e70)
@@ -577,4 +574,58 @@ if (WIN32)
     alpha_patch_class(GeometryDash FMODAudioEngine
         "    TodoReturn resumeSuspendedAudio();"
         "    void resumeSuspendedAudio() = win 0x5e030;")
+endif()
+
+# The current search page adds a no-stars sprite at 0x1c8. The native
+# difficulty/length arrays move to 0x1d0/0x1d8 and their dictionary to 0x1e0.
+alpha_patch_class(GeometryDash LevelSearchLayer
+    "    cocos2d::CCArray* m_difficultySprites;"
+    "    win {\n    cocos2d::CCSprite* m_noStarsSprite;\n    }\n    cocos2d::CCArray* m_difficultySprites;")
+set(alpha_search_inline "${alpha_bindings_output}/inline/LevelSearchLayer.cpp")
+file(READ "${alpha_search_inline}" alpha_search_content)
+set(alpha_search_before "    m_starsSprite = nullptr;")
+string(FIND "${alpha_search_content}" "${alpha_search_before}" alpha_search_match)
+if (alpha_search_match LESS 0)
+    message(FATAL_ERROR "Unexpected LevelSearchLayer constructor implementation")
+endif()
+string(REPLACE "${alpha_search_before}"
+    "${alpha_search_before}\n#ifdef GEODE_IS_WINDOWS\n    m_noStarsSprite = nullptr;\n#endif"
+    alpha_search_content "${alpha_search_content}")
+file(CONFIGURE OUTPUT "${alpha_search_inline}" CONTENT "${alpha_search_content}" @ONLY)
+alpha_patch_address(GeometryDash LevelSearchLayer "bool checkDiff(int diff)" 0x43aaf0)
+alpha_patch_address(GeometryDash LevelSearchLayer "bool checkTime(int time)" 0x43b120)
+
+# GJRequestCell's native init is 0x158d20 (primary vtable 0x73cef0).
+# Its allocation is 0x248: score at 0x230, toggler at 0x238 and the
+# score-type-four flag at 0x240. The old popup callbacks have no native
+# vtable slots in this version. Do not expose unrelated function addresses.
+if (WIN32)
+    foreach(obsolete IN ITEMS
+        "    virtual void FLAlert_Clicked(FLAlertLayer* layer, bool btn2) = win 0x9999999;"
+        "    virtual void uploadActionFinished(int id, int response) = win 0x9999999;"
+        "    virtual void uploadActionFailed(int id, int response) = win 0x9999999;"
+        "    virtual void onClosePopup(UploadActionPopup* popup) = win 0x9999999;"
+        "    void markAsRead() = win 0x504490, imac 0x240820, m1 0x1eb810;"
+        "    void onDeleteRequest(cocos2d::CCObject* sender);"
+        "    void onViewFriendRequest(cocos2d::CCObject* sender) = win 0x1550d0;")
+        alpha_patch_class(GeometryDash GJRequestCell "${obsolete}\n" "")
+    endforeach()
+    alpha_patch_class(GeometryDash GJRequestCell
+        "    UploadActionPopup* m_popup;\n    CCMenuItemToggler* m_toggler;"
+        "    CCMenuItemToggler* m_toggler;\n    bool m_isScoreTypeFour;\n    PAD = win 0x7;")
+    alpha_patch_class(GeometryDash GJRequestCell
+        "void onToggle(cocos2d::CCObject* sender);"
+        "void onToggle(cocos2d::CCObject* sender) = win 0x1592a0;")
+    alpha_patch_class(GeometryDash GJRequestCell
+        "void onViewProfile(cocos2d::CCObject* sender) = imac"
+        "void onViewProfile(cocos2d::CCObject* sender) = win 0x157b80, imac")
+    set(alpha_request_inline "${alpha_bindings_output}/inline/GJRequestCell.cpp")
+    file(READ "${alpha_request_inline}" alpha_request_content)
+    set(alpha_request_before "    auto glm = GameLevelManager::sharedState();\n    // TODO: 2.209\n    // if (glm->m_uploadActionDelegate == this) glm->m_uploadActionDelegate = nullptr;\n    if (m_popup) m_popup->m_delegate = nullptr;\n")
+    string(FIND "${alpha_request_content}" "${alpha_request_before}" alpha_request_match)
+    if (alpha_request_match LESS 0)
+        message(FATAL_ERROR "Unexpected GJRequestCell destructor implementation")
+    endif()
+    string(REPLACE "${alpha_request_before}" "" alpha_request_content "${alpha_request_content}")
+    file(CONFIGURE OUTPUT "${alpha_request_inline}" CONTENT "${alpha_request_content}" @ONLY)
 endif()
