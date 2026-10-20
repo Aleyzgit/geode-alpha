@@ -64,7 +64,7 @@ The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
 The GJGameLevel layout and editor build statistics now use the newer upstream
 bindings, including corrected level-browser, slider and secret-level methods.
-**65 Windows native-address placeholders remain**
+**63 Windows native-address placeholders remain**
 in the pinned game declarations. The engine declarations have no remaining
 Windows placeholders. Additional unsafe or incorrect entries have been corrected,
 including PVR functions that previously pointed outside executable memory.
@@ -98,7 +98,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. Seventy native checks passed in both
+Windows validation used Clang 21.1.8. Seventy-two native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -127,7 +127,9 @@ session state and delayed-spawn containers with native construction/destruction.
 Two unrelated addresses for editor removal and last-object position are corrected.
 Fresh editors initialize with and without their UI; a temporary level exercises
 object creation, special-object registration and removal through native methods.
-All 5,453 populated generated wrappers point into executable
+Editor minimum-X transforms restore the object layer's position, and native
+multiplayer download removal preserves unrelated cached requests.
+All 5,455 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its

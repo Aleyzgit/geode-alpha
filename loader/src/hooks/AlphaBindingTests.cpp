@@ -21,6 +21,7 @@
 #include <Geode/binding/GJKeybindManager.hpp>
 #include <Geode/binding/GlobalKeybindSource.hpp>
 #include <Geode/binding/GJLevelList.hpp>
+#include <Geode/binding/GJMultiplayerManager.hpp>
 #include <Geode/binding/GJOptionsLayer.hpp>
 #include <Geode/binding/GJRequestCell.hpp>
 #include <Geode/binding/GJRewardItem.hpp>
@@ -51,6 +52,11 @@
 using namespace geode::prelude;
 
 #ifdef GEODE_IS_WINDOWS
+// ABI checks deliberately inspect polymorphic native class layouts.
+#ifdef __clang__
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Winvalid-offsetof"
+#endif
 static_assert(sizeof(GJOptionsLayer) == 0x470);
 static_assert(sizeof(PagedListPopup) == 0x308);
 static_assert(std::is_abstract_v<PagedListPopup>);
@@ -966,5 +972,40 @@ $on_game(Loaded) {
             return position && editor->m_objects->count() == count;
         });
     });
+
+    runBindingTest("Native editor minimum X transform", [] {
+        return withNativeEditor(false, [](LevelEditorLayer* editor) {
+            auto layer = editor->m_objectLayer;
+            auto before = layer->getPosition();
+            auto first = editor->m_editorUI->getXMin(0);
+            bool restored = layer->getPosition() == before;
+            auto shifted = before + CCPoint { 111.f, 222.f };
+            layer->setPosition(shifted);
+            auto second = editor->m_editorUI->getXMin(200);
+            restored = restored && layer->getPosition() == shifted;
+            layer->setPosition(before);
+            return restored && std::isfinite(first) && std::abs(first - second) < .001f;
+        });
+    });
+
+    runBindingTest("Native multiplayer download cache removal", [] {
+        auto manager = GJMultiplayerManager::sharedState();
+        auto dictionary = CCDictionary::create();
+        AlphaTestField downloads(manager->m_activeDownloads, dictionary);
+        auto kept = CCString::create("preserved");
+        manager->addDLToActive("alpha-kept", kept);
+        manager->addDLToActive("alpha-download", CCString::create("fixture"));
+        std::string longTag(96, 'a');
+        manager->addDLToActive(longTag.c_str(), CCString::create("long fixture"));
+        manager->removeDLFromActive("alpha-download");
+        manager->removeDLFromActive(longTag.c_str());
+        manager->removeDLFromActive("alpha-absent");
+        return !manager->isDLActive("alpha-download") &&
+            !manager->isDLActive(longTag.c_str()) && dictionary->count() == 1 &&
+            manager->getDLObject("alpha-kept") == kept;
+    });
 }
+#ifdef __clang__
+    #pragma clang diagnostic pop
+#endif
 #endif

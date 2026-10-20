@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 65 Windows address placeholders are in
+respective modules. The remaining 63 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
 `d6f3312f0886b2c285fd0d2593ebabdc03b6ca0c`. The generated Windows build has
-5,453 populated native wrappers, all pointing into executable sections of
+5,455 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The updated upstream declarations include the current gameplay-layer state
@@ -40,7 +40,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-70 checks cover native constructors, level/list cache fixtures, fresh/expired
+72 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -80,6 +80,13 @@ addSpecial, checks the last-object position and removes it again. Existing
 local-level arrays and manager fields are restored before saving. Library
 requests are suppressed in the fixture. These checks do not establish that
 every editor feature works.
+
+EditorUI::getXMin uses 0x1bf270; its native Windows body does not use the
+integer argument. Tests verify that translating the object layer does not
+change the result and that the native temporary-position change is restored.
+GJMultiplayerManager::removeDLFromActive uses 0x390a10 and its dictionary at
+0x140. Tests remove short and long tags, allow an absent tag and preserve an
+unrelated entry. The test uses no lobby or network request.
 
 Additional fixtures exercise achievement/download lookups, username and ID
 caches, coin/completion namespaces, color interpolation, hue matrices, animation

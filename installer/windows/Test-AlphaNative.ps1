@@ -77,7 +77,9 @@ $expected = @(
     'Native editor layer layout',
     'Native editor construction boundary',
     'Native fresh editor construction',
-    'Native editor object creation and removal'
+    'Native editor object creation and removal',
+    'Native editor minimum X transform',
+    'Native multiplayer download cache removal'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {

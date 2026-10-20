@@ -652,6 +652,15 @@ alpha_patch_address(GeometryDash LevelEditorLayer
 alpha_patch_address(GeometryDash LevelEditorLayer
     "void removeSpecial(GameObject* object)" 0x3f5290)
 
+# Native getXMin reads EditorUI's layer at 0x5e8, temporarily resets its
+# object-layer position and restores it after the coordinate conversion.
+# The integer parameter is unused in this Windows implementation.
+alpha_patch_address(GeometryDash EditorUI "float getXMin(int offset)" 0x1bf270)
+# Both mapped HTTP completion paths remove their tag from the active-download
+# dictionary at 0x140 through this function, including heap-backed tag strings.
+alpha_patch_address(GeometryDash GJMultiplayerManager
+    "void removeDLFromActive(char const* tag)" 0x390a10)
+
 # GJRequestCell's native init is 0x158d20 (primary vtable 0x73cef0).
 # Its allocation is 0x248: score at 0x230, toggler at 0x238 and the
 # request-status-four flag at 0x240. The old popup callbacks have no native
