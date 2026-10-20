@@ -661,6 +661,54 @@ alpha_patch_address(GeometryDash EditorUI "float getXMin(int offset)" 0x1bf270)
 alpha_patch_address(GeometryDash GJMultiplayerManager
     "void removeDLFromActive(char const* tag)" 0x390a10)
 
+# Native NumberInputLayer is 0x300: title label 0x2a0, OK button 0x2a8,
+# display prefix 0x2b8, input 0x2d8 and delegate 0x2f8. onDone is the
+# additional virtual slot at 0x438, also overridden by ParentalGateLayer.
+if (WIN32)
+    alpha_patch_class(GeometryDash NumberInputLayer
+        "    NumberInputLayer() = inline;"
+        "    NumberInputLayer() = win 0x4a1060, inline;")
+    alpha_patch_class(GeometryDash NumberInputLayer
+        "    void onDone(cocos2d::CCObject* sender) = win inline;"
+        "    virtual void onDone(cocos2d::CCObject* sender) = win 0x4a1b10;")
+    alpha_patch_class(GeometryDash NumberInputLayer
+        "    CCMenuItemSpriteExtra* m_okButton;"
+        "    cocos2d::CCLabelBMFont* m_titleLabel;\n    CCMenuItemSpriteExtra* m_okButton;")
+    alpha_patch_class(GeometryDash NumberInputLayer
+        "    std::string m_inputString;"
+        "    std::string m_inputPrefix;\n    std::string m_inputString;")
+    set(alpha_number_inline "${alpha_bindings_output}/inline/NumberInputLayer.cpp")
+    file(READ "${alpha_number_inline}" alpha_number_content)
+    set(alpha_number_constructor [=[NumberInputLayer::NumberInputLayer() {
+    m_okButton = nullptr;
+    m_minimum = 4;
+    m_maximum = 4;
+    m_delegate = nullptr;
+}]=])
+    set(alpha_number_done [=[void NumberInputLayer::onDone(cocos2d::CCObject* sender) {
+    if (m_delegate) m_delegate->numberInputClosed(this);
+    this->onClose(nullptr);
+}]=])
+    foreach(body IN ITEMS "${alpha_number_constructor}" "${alpha_number_done}")
+        string(FIND "${alpha_number_content}" "${body}" alpha_number_match)
+        if (alpha_number_match LESS 0)
+            message(FATAL_ERROR "Unexpected NumberInputLayer inline implementation")
+        endif()
+        string(REPLACE "${body}" "" alpha_number_content "${alpha_number_content}")
+    endforeach()
+    file(CONFIGURE OUTPUT "${alpha_number_inline}" CONTENT "${alpha_number_content}" @ONLY)
+    # The native derived factory reserves one additional integer and alignment.
+    alpha_patch_class(GeometryDash ParentalGateLayer
+        "static ParentalGateLayer* create() = m1"
+        "static ParentalGateLayer* create() = win 0x4d3ba0, m1")
+    alpha_patch_class(GeometryDash ParentalGateLayer
+        "    TodoReturn generateChallenge();"
+        "    TodoReturn generateChallenge();\n    int m_expectedAnswer;")
+endif()
+alpha_patch_address(GeometryDash NumberInputLayer
+    "void onNumber(cocos2d::CCObject* sender)" 0x4a1820 0x2157c0)
+alpha_patch_address(GeometryDash NumberInputLayer "void updateNumberState()" 0x4a1990)
+
 # GJRequestCell's native init is 0x158d20 (primary vtable 0x73cef0).
 # Its allocation is 0x248: score at 0x230, toggler at 0x238 and the
 # request-status-four flag at 0x240. The old popup callbacks have no native

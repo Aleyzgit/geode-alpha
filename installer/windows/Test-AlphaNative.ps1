@@ -79,7 +79,11 @@ $expected = @(
     'Native fresh editor construction',
     'Native editor object creation and removal',
     'Native editor minimum X transform',
-    'Native multiplayer download cache removal'
+    'Native multiplayer download cache removal',
+    'Native number input layout',
+    'Native number input construction boundary',
+    'Native number input controls and delegate',
+    'Native arithmetic gate construction'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {

@@ -32,6 +32,9 @@
 #include <Geode/binding/LevelEditorLayer.hpp>
 #include <Geode/binding/LevelSearchLayer.hpp>
 #include <Geode/binding/MusicDownloadManager.hpp>
+#include <Geode/binding/NumberInputLayer.hpp>
+#include <Geode/binding/NumberInputDelegate.hpp>
+#include <Geode/binding/ParentalGateLayer.hpp>
 #include <Geode/binding/OBB2D.hpp>
 #include <Geode/binding/PulseEffectAction.hpp>
 #include <Geode/binding/PagedListPopup.hpp>
@@ -75,6 +78,16 @@ static_assert(std::is_abstract_v<CCKeyboardActionManager>);
 static_assert(std::is_abstract_v<EditorWindowPopup>);
 static_assert(std::is_abstract_v<ScrollViewPopup>);
 namespace {
+    class AlphaNumberReceiver final : public NumberInputDelegate {
+    public:
+        NumberInputLayer* popup = nullptr;
+        std::string text;
+        void numberInputClosed(NumberInputLayer* value) override {
+            popup = value;
+            text = value->m_inputString;
+        }
+    };
+
     class AlphaRequestCanary final : public GJRequestCell {
     public:
         std::array<uint8_t, 32> guard;
@@ -1003,6 +1016,71 @@ $on_game(Loaded) {
         return !manager->isDLActive("alpha-download") &&
             !manager->isDLActive(longTag.c_str()) && dictionary->count() == 1 &&
             manager->getDLObject("alpha-kept") == kept;
+    });
+
+    runBindingTest("Native number input layout", [] {
+        return sizeof(NumberInputLayer) == 0x300 &&
+            sizeof(ParentalGateLayer) == 0x308 &&
+            offsetof(NumberInputLayer, m_okButton) == 0x2a8 &&
+            offsetof(NumberInputLayer, m_inputString) == 0x2d8 &&
+            offsetof(NumberInputLayer, m_delegate) == 0x2f8;
+    });
+
+    runBindingTest("Native number input construction boundary", [] {
+        alignas(NumberInputLayer) std::array<uint8_t, sizeof(NumberInputLayer) + 32> storage;
+        storage.fill(0xa5);
+        auto destroy = [](NumberInputLayer* layer) { layer->~NumberInputLayer(); };
+        std::unique_ptr<NumberInputLayer, decltype(destroy)> popup(
+            new (storage.data()) NumberInputLayer(), destroy);
+        bool valid = !popup->m_titleLabel && !popup->m_okButton && !popup->m_delegate &&
+            popup->m_minimum == 4 && popup->m_maximum == 4 &&
+            popup->m_inputPrefix.empty() && popup->m_inputString.empty();
+        popup->m_inputPrefix = std::string(96, 'p');
+        popup->m_inputString = std::string(96, '7');
+        popup.reset();
+        return valid && std::all_of(storage.begin() + sizeof(NumberInputLayer), storage.end(),
+            [](uint8_t value) { return value == 0xa5; });
+    });
+
+    runBindingTest("Native number input controls and delegate", [] {
+        auto popup = NumberInputLayer::create();
+        if (!popup || !popup->m_inputLabel || !popup->m_titleLabel || !popup->m_okButton) return false;
+        popup->m_minimum = 2;
+        popup->m_maximum = 4;
+        popup->updateNumberState();
+        if (popup->m_okButton->isEnabled()) return false;
+        auto sender = CCNode::create();
+        sender->setTag(7);
+        popup->onNumber(sender);
+        if (popup->m_inputString != "7" || popup->m_okButton->isEnabled()) return false;
+        sender->setTag(3);
+        popup->onNumber(sender);
+        if (popup->m_inputString != "73" || !popup->m_okButton->isEnabled()) return false;
+        popup->inputNumber(5);
+        sender->setTag(10);
+        popup->onNumber(sender);
+        if (popup->m_inputString != "73") return false;
+        popup->deleteLast();
+        if (popup->m_inputString != "7" || popup->m_okButton->isEnabled()) return false;
+        popup->m_inputString = "7359";
+        popup->m_inputPrefix = "ID: ";
+        popup->updateNumberState();
+        if (std::string(popup->m_inputLabel->getString()) != "ID: 7359" ||
+            !popup->m_okButton->isEnabled()) return false;
+        AlphaNumberReceiver receiver;
+        popup->m_delegate = &receiver;
+        sender->setTag(12);
+        popup->onNumber(sender);
+        popup->m_delegate = nullptr;
+        return receiver.popup == popup && receiver.text == "7359";
+    });
+
+    runBindingTest("Native arithmetic gate construction", [] {
+        auto popup = ParentalGateLayer::create();
+        // Exercise construction only; do not submit or change any settings.
+        return popup && popup->m_inputLabel && popup->m_titleLabel && popup->m_okButton &&
+            !popup->m_inputPrefix.empty() &&
+            std::string(popup->m_inputLabel->getString()) == popup->m_inputPrefix + popup->m_inputString;
     });
 }
 #ifdef __clang__

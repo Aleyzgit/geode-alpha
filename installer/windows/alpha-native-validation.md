@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 63 Windows address placeholders are in
+respective modules. The remaining 62 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
 `d6f3312f0886b2c285fd0d2593ebabdc03b6ca0c`. The generated Windows build has
-5,455 populated native wrappers, all pointing into executable sections of
+5,459 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The updated upstream declarations include the current gameplay-layer state
@@ -40,7 +40,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-72 checks cover native constructors, level/list cache fixtures, fresh/expired
+76 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -87,6 +87,15 @@ change the result and that the native temporary-position change is restored.
 GJMultiplayerManager::removeDLFromActive uses 0x390a10 and its dictionary at
 0x140. Tests remove short and long tags, allow an absent tag and preserve an
 unrelated entry. The test uses no lobby or network request.
+
+NumberInputLayer reserves 0x300 bytes instead of the previous SDK's 0x2d8.
+Its title label is at 0x2a0, display prefix at 0x2b8, input string at 0x2d8
+and delegate at 0x2f8. Native construction is 0x4a1060, digit/backspace actions
+use 0x4a1820 and state updates use 0x4a1990. The additional virtual onDone
+slot at 0x438 uses 0x4a1b10. Tests exercise long-string destruction, editing,
+length bounds, label text and a temporary completion receiver.
+ParentalGateLayer reserves 0x308 bytes and its native factory is 0x4d3ba0;
+only construction is tested, without submitting an answer or changing settings.
 
 Additional fixtures exercise achievement/download lookups, username and ID
 caches, coin/completion namespaces, color interpolation, hue matrices, animation
