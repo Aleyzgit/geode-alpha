@@ -85,7 +85,15 @@ $expected = @(
     'Native number input controls and delegate',
     'Native arithmetic gate construction',
     'Native animated counter updates',
-    'Native gameplay counter labels'
+    'Native gameplay counter labels',
+    'Native manager save callback slots',
+    'Native gameplay virtual slots',
+    'Native SFX delegate virtual slots',
+    'Native gameplay virtual dispatch',
+    'Native typed SFX delegate callbacks',
+    'Native tab and browser layouts',
+    'Native tab and browser construction boundaries',
+    'Native game settings tabs'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {

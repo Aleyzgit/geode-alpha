@@ -10,17 +10,20 @@
 #include <Geode/binding/ColorChannelSprite.hpp>
 #include <Geode/binding/CommentAdminDelegate.hpp>
 #include <Geode/binding/CreateGuidelinesLayer.hpp>
+#include <Geode/binding/CustomSFXDelegate.hpp>
 #include <Geode/binding/EditorUI.hpp>
 #include <Geode/binding/EditorWindowPopup.hpp>
 #include <Geode/binding/FMODAudioEngine.hpp>
 #include <Geode/binding/GameLevelManager.hpp>
 #include <Geode/binding/GameManager.hpp>
+#include <Geode/binding/GameSettingsLayer.hpp>
 #include <Geode/binding/GameStatsManager.hpp>
 #include <Geode/binding/GameToolbox.hpp>
 #include <Geode/binding/GJEffectManager.hpp>
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/binding/GJKeybindManager.hpp>
 #include <Geode/binding/GlobalKeybindSource.hpp>
+#include <Geode/binding/GManager.hpp>
 #include <Geode/binding/GJLevelList.hpp>
 #include <Geode/binding/GJMultiplayerManager.hpp>
 #include <Geode/binding/GJOptionsLayer.hpp>
@@ -32,6 +35,8 @@
 #include <Geode/binding/LevelUploadDelegate.hpp>
 #include <Geode/binding/LabelGameObject.hpp>
 #include <Geode/binding/LevelEditorLayer.hpp>
+#include <Geode/binding/LevelBrowserLayer.hpp>
+#include <Geode/binding/LevelListLayer.hpp>
 #include <Geode/binding/LevelSearchLayer.hpp>
 #include <Geode/binding/MusicDownloadManager.hpp>
 #include <Geode/binding/NumberInputLayer.hpp>
@@ -40,6 +45,8 @@
 #include <Geode/binding/OBB2D.hpp>
 #include <Geode/binding/PulseEffectAction.hpp>
 #include <Geode/binding/PagedListPopup.hpp>
+#include <Geode/binding/PlayLayer.hpp>
+#include <Geode/binding/SFXBrowser.hpp>
 #include <Geode/binding/SpriteAnimationManager.hpp>
 #include <Geode/binding/ScrollViewPopup.hpp>
 #include <Geode/binding/SetTextPopup.hpp>
@@ -48,11 +55,14 @@
 #include <Geode/binding/VirtualRowSource.hpp>
 #include <Geode/binding/UserInfoDelegate.hpp>
 #include <Geode/binding/UploadActionPopup.hpp>
+#include <Geode/binding/TableViewCellDelegate.hpp>
+#include <Geode/binding/TabbedPopupLayer.hpp>
 #include <Geode/cocos/particle_nodes/CCParticleSystemQuad.h>
 #include <Geode/cocos/CCScheduler.h>
 #include <Geode/cocos/cocoa/CCAutoreleasePool.h>
 #include <Geode/loader/GameEvent.hpp>
 #include <Geode/loader/Loader.hpp>
+#include <Geode/utils/addresser.hpp>
 
 using namespace geode::prelude;
 
@@ -80,6 +90,41 @@ static_assert(std::is_abstract_v<CCKeyboardActionManager>);
 static_assert(std::is_abstract_v<EditorWindowPopup>);
 static_assert(std::is_abstract_v<ScrollViewPopup>);
 namespace {
+    class AlphaTabbedFixture final : public TabbedPopupLayer {};
+    class AlphaBrowserFixture final : public LevelBrowserLayer {};
+    class AlphaListFixture final : public LevelListLayer {};
+
+    template <class T>
+    bool checkConstructionBoundary() {
+        alignas(T) std::array<uint8_t, sizeof(T) + 32> storage;
+        storage.fill(0xa5);
+        auto value = new (storage.data()) T();
+        value->T::~T();
+        return std::all_of(storage.begin() + sizeof(T), storage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
+    }
+
+    class AlphaSFXReceiver final : public CustomSFXDelegate {
+    public:
+        bool played = false;
+        int getActiveCustomSFXID() override { return 717171; }
+        bool overridePlaySFX(SFXInfoObject*) override {
+            played = true;
+            return true;
+        }
+    };
+
+    class AlphaTableSelection final : public TableViewCellDelegate {
+    public:
+        int getSelectedCellCustomIdx() override { return 717171; }
+        bool allowsCustomSFXActions() override { return true; }
+        bool isCustomIDSelected(int id) override { return id == 717171; }
+        bool inCustomSFXTree() override { return true; }
+        bool showsSFXInfoButton() override { return true; }
+        bool shouldSnapToSelected() override { return false; }
+        int getCellDelegateType() override { return -1; }
+    };
+
     class AlphaNumberReceiver final : public NumberInputDelegate {
     public:
         NumberInputLayer* popup = nullptr;
@@ -1122,6 +1167,90 @@ $on_game(Loaded) {
             editor->updateCounters(717171, 99);
             editor->updateCounters(717172, 11);
             return label->m_labelString == "-17" && editor->m_labelObjects.size() == 1;
+        });
+    });
+
+    runBindingTest("Native manager save callback slots", [] {
+        using geode::addresser::getVirtualOffset;
+        return getVirtualOffset(&GManager::didEncodeForSave) == 0x388 &&
+            getVirtualOffset(&GManager::saveFinished) == 0x390 &&
+            getVirtualOffset(&GManager::dataLoaded) == 0x398 &&
+            getVirtualOffset(&GManager::firstLoad) == 0x3a0 &&
+            getVirtualOffset(&GameManager::dataLoaded) == 0x398 &&
+            getVirtualOffset(&LocalLevelManager::saveFinished) == 0x390;
+    });
+
+    runBindingTest("Native gameplay virtual slots", [] {
+        using geode::addresser::getVirtualOffset;
+        return getVirtualOffset(&GJBaseGameLayer::shouldDrawDebugHitboxes) == 0x488 &&
+            getVirtualOffset(&GJBaseGameLayer::getHitboxTrailMax) == 0x4a0 &&
+            getVirtualOffset(&GJBaseGameLayer::addToSection) == 0x4a8 &&
+            getVirtualOffset(&LevelEditorLayer::addToGroup) == 0x4b0 &&
+            getVirtualOffset(&PlayLayer::addToGroup) == 0x4b0;
+    });
+
+    runBindingTest("Native SFX delegate virtual slots", [] {
+        using geode::addresser::getVirtualOffset;
+        return getVirtualOffset(&CustomSFXDelegate::getActiveCustomSFXID) == 0x10 &&
+            getVirtualOffset(&CustomSFXDelegate::overridePlaySFX) == 0x18 &&
+            getVirtualOffset(&TableViewCellDelegate::getSelectedCellCustomIdx) == 0x10 &&
+            getVirtualOffset(&TableViewCellDelegate::shouldSnapToSelected) == 0x38 &&
+            getVirtualOffset(&TableViewCellDelegate::getCellDelegateType) == 0x40 &&
+            getVirtualOffset(&SFXBrowser::inCustomSFXTree) == 0x28;
+    });
+
+    runBindingTest("Native gameplay virtual dispatch", [] {
+        return withNativeEditor(false, [](LevelEditorLayer* editor) {
+            auto base = static_cast<GJBaseGameLayer*>(editor);
+            return base->getHitboxTrailMax() == 72000 &&
+                editor->GJBaseGameLayer::getHitboxTrailMax() == 480 &&
+                base->shouldDrawDebugHitboxes() == editor->LevelEditorLayer::shouldDrawDebugHitboxes() &&
+                base->shouldDrawHitboxTrail() == editor->LevelEditorLayer::shouldDrawHitboxTrail() &&
+                base->shouldRecordHitboxTrail() == editor->LevelEditorLayer::shouldRecordHitboxTrail();
+        });
+    });
+
+    runBindingTest("Native typed SFX delegate callbacks", [] {
+        AlphaSFXReceiver receiver;
+        auto custom = static_cast<CustomSFXDelegate*>(&receiver);
+        AlphaTableSelection selection;
+        auto table = static_cast<TableViewCellDelegate*>(&selection);
+        return custom->getActiveCustomSFXID() == 717171 && custom->overridePlaySFX(nullptr) &&
+            receiver.played && table->getSelectedCellCustomIdx() == 717171 &&
+            table->allowsCustomSFXActions() && table->isCustomIDSelected(717171) &&
+            !table->isCustomIDSelected(717172) && table->inCustomSFXTree() &&
+            table->showsSFXInfoButton() && !table->shouldSnapToSelected() &&
+            table->getCellDelegateType() == -1;
+    });
+
+    runBindingTest("Native tab and browser layouts", [] {
+        using geode::addresser::getThunkOffset;
+        return sizeof(TabbedPopupLayer) == 0x430 && sizeof(GameSettingsLayer) == 0x4a8 &&
+            sizeof(LevelBrowserLayer) == 0x348 && sizeof(LevelListLayer) == 0x408 &&
+            getThunkOffset(&GameSettingsLayer::dropDownLayerWillClose) == 0x430 &&
+            getThunkOffset(&LevelListLayer::textChanged) == 0x348 &&
+            getThunkOffset(&LevelListLayer::levelListDeleteFinished) == 0x360;
+    });
+
+    runBindingTest("Native tab and browser construction boundaries", [] {
+        auto manager = GameManager::sharedState();
+        AlphaTestField scene(manager->m_sceneEnum, manager->m_sceneEnum);
+        return checkConstructionBoundary<AlphaTabbedFixture>() &&
+            checkConstructionBoundary<AlphaBrowserFixture>() &&
+            checkConstructionBoundary<AlphaListFixture>();
+    });
+
+    runBindingTest("Native game settings tabs", [] {
+        return withNativeEditor(false, [](LevelEditorLayer* editor) {
+            auto settings = GameSettingsLayer::create(editor, 0);
+            if (!settings || settings->m_gameLayer != editor || !settings->getChildrenCount()) {
+                return false;
+            }
+            auto tabs = static_cast<TabbedPopupLayer*>(settings);
+            tabs->showTab(0);
+            auto delegate = static_cast<GJDropDownLayerDelegate*>(settings);
+            delegate->dropDownLayerWillClose(nullptr);
+            return settings->m_gameLayer == editor && settings->getChildrenCount() > 0;
         });
     });
 }

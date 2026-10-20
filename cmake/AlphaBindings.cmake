@@ -45,9 +45,9 @@ if (NOT GEODE_BINDINGS_PATH)
     # Keep the fetched unversioned header intact. Windows request IDs changed
     # when native APIs were inserted into the shared HTTP dispatch enum.
     file(READ "${GEODE_BINDINGS_REPO_PATH}/bindings/include/Geode/Enums.hpp" alpha_enums)
-    # SoundStateContainer uses std::array without a direct include in its
-    # generated header. Keep it valid independently of unity source ordering.
-    set(alpha_enums "#include <array>\n${alpha_enums}")
+    # Generated state headers use arrays, maps and cocos value types without
+    # direct includes. Keep them valid independently of unity source ordering.
+    set(alpha_enums "#include <array>\n#include <map>\n#include <Geode/cocos/include/ccTypes.h>\n${alpha_enums}")
     string(REGEX MATCH "enum class UserListType \\{[^}]*\\};" alpha_old_user_lists "${alpha_enums}")
     if (NOT alpha_old_user_lists)
         message(FATAL_ERROR "Missing upstream UserListType enum")

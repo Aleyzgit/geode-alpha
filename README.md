@@ -98,7 +98,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. Seventy-eight native checks passed in both
+Windows validation used Clang 21.1.8. Eighty-six native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -133,6 +133,13 @@ The number-input popup uses its current 0x300-byte layout and native digit and
 completion callbacks; tests cover editing, limits, display prefixes and delegates.
 Counter fixtures cover increasing/decreasing animations and updates to an actual
 gameplay counter object, including value limits and its update lock.
+Save-manager, gameplay and SFX callbacks use the current native virtual order
+and typed return values. A local audit matched all 2,148 checked virtual methods
+across 461 classes to native RTTI tables after correcting 84 slot or base-offset
+disagreements. Tabbed settings and level browsers reserve their full native
+allocations; fixtures cover construction/destruction boundaries and actual
+game-settings tab dispatch. This audit covers known mapped virtual methods,
+not every SDK interface or mod.
 All 5,461 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test

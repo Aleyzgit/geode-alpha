@@ -717,6 +717,98 @@ alpha_patch_address(GeometryDash CCCounterLabel "void updateCounter(float dt)" 0
 alpha_patch_address(GeometryDash GJBaseGameLayer
     "void updateCounters(int itemId, int value)" 0x33cb90)
 
+# Compare the SDK member-pointer slots with native RTTI tables, not just the
+# presence of an executable address. New callback groups moved older slots.
+if (WIN32)
+    alpha_patch_class(GeometryDash GManager [=[    virtual void dataLoaded(DS_Dictionary* dict) = win inline, imac 0x4a5bf0, m1 0x40cd80;
+    virtual void firstLoad() = win inline, imac 0x4a5c00, m1 0x40cd84;
+    virtual TodoReturn didEncodeForSave() = win 0x3f5c0;
+    virtual TodoReturn saveFinished(bool) = win 0x3f5c0;]=]
+        [=[    virtual void didEncodeForSave() = win 0x3f5c0;
+    virtual void saveFinished(bool) = win 0x3f5c0;
+    virtual void dataLoaded(DS_Dictionary* dict) = win inline, imac 0x4a5bf0, m1 0x40cd80;
+    virtual void firstLoad() = win inline, imac 0x4a5c00, m1 0x40cd84;]=])
+    foreach(class IN ITEMS GameManager LocalLevelManager)
+        alpha_patch_class(GeometryDash "${class}"
+            "virtual TodoReturn didEncodeForSave()" "virtual void didEncodeForSave()")
+        alpha_patch_class(GeometryDash "${class}"
+            "virtual TodoReturn saveFinished(bool)" "virtual void saveFinished(bool)")
+    endforeach()
+
+    set(alpha_hitbox_before [=[    virtual TodoReturn shouldDrawDebugHitboxes() = win 0x317660;
+    virtual TodoReturn shouldDrawHitboxTrail() = win 0x5a3a0;
+    virtual TodoReturn shouldRecordHitboxTrail() = win 0x5a3a0;
+    virtual TodoReturn getHitboxTrailMax() = win 0x317680;
+]=])
+    alpha_patch_class(GeometryDash GJBaseGameLayer "${alpha_hitbox_before}" "")
+    set(alpha_section_declaration "    virtual void addToSection(GameObject* object) = win 0x32f280, imac 0x11d090, m1 0xf7654;")
+    alpha_patch_class(GeometryDash GJBaseGameLayer "${alpha_section_declaration}"
+        "    virtual bool shouldDrawDebugHitboxes() = win 0x317660;\n    virtual bool shouldDrawHitboxTrail() = win 0x5a3a0;\n    virtual bool shouldRecordHitboxTrail() = win 0x5a3a0;\n    virtual int getHitboxTrailMax() = win 0x317680;\n${alpha_section_declaration}")
+    foreach(class IN ITEMS LevelEditorLayer PlayLayer)
+        foreach(method IN ITEMS shouldDrawDebugHitboxes shouldDrawHitboxTrail shouldRecordHitboxTrail)
+            alpha_patch_class(GeometryDash "${class}"
+                "virtual TodoReturn ${method}()" "virtual bool ${method}()")
+        endforeach()
+        alpha_patch_class(GeometryDash "${class}"
+            "virtual TodoReturn getHitboxTrailMax()" "virtual int getHitboxTrailMax()")
+    endforeach()
+
+    alpha_patch_class(GeometryDash CustomSFXDelegate
+        "    virtual bool overridePlaySFX(SFXInfoObject* object) = inline;\n    virtual int getActiveCustomSFXID() = inline;"
+        "    virtual int getActiveCustomSFXID() = inline;\n    virtual bool overridePlaySFX(SFXInfoObject* object) = inline;")
+    alpha_patch_class(GeometryDash TableViewCellDelegate [=[    virtual bool shouldSnapToSelected() = inline;
+    virtual int getCellDelegateType() = inline;
+    virtual TodoReturn getSelectedCellCustomIdx() = win 0x98e00;
+    virtual TodoReturn allowsCustomSFXActions() = win 0x5a3a0;
+    virtual bool isCustomIDSelected(int) = win 0x5a3a0;
+    virtual TodoReturn inCustomSFXTree() = win 0x5a3a0;
+    virtual TodoReturn showsSFXInfoButton() = win 0x5a3a0;]=]
+        [=[    virtual int getSelectedCellCustomIdx() = win 0x98e00;
+    virtual bool allowsCustomSFXActions() = win 0x5a3a0;
+    virtual bool isCustomIDSelected(int) = win 0x5a3a0;
+    virtual bool inCustomSFXTree() = win 0x5a3a0;
+    virtual bool showsSFXInfoButton() = win 0x5a3a0;
+    virtual bool shouldSnapToSelected() = inline;
+    virtual int getCellDelegateType() = inline;]=])
+    alpha_patch_class(GeometryDash SFXBrowser
+        "virtual TodoReturn getSelectedCellCustomIdx()" "virtual int getSelectedCellCustomIdx()")
+    foreach(method IN ITEMS allowsCustomSFXActions inCustomSFXTree showsSFXInfoButton)
+        alpha_patch_class(GeometryDash SFXBrowser
+            "virtual TodoReturn ${method}()" "virtual bool ${method}()")
+    endforeach()
+    alpha_patch_class(GeometryDash SFXBrowser
+        "    virtual bool showsSFXInfoButton() = win 0x6202a0;"
+        "    virtual bool showsSFXInfoButton() = win 0x6202a0;\n    virtual int getCellDelegateType() = win 0x98e00;")
+endif()
+
+# Native constructors reserve the additional tab state and browser pointers.
+# Their derived delegates must follow the complete native base allocation.
+if (WIN32)
+    alpha_patch_class(GeometryDash TabbedPopupLayer
+        "    virtual ~TabbedPopupLayer()"
+        "    TabbedPopupLayer() = win 0x19cc00;\n    virtual ~TabbedPopupLayer()")
+    alpha_patch_class(GeometryDash TabbedPopupLayer
+        "    TodoReturn refreshTabButtons(char const*, char const*);"
+        "    TodoReturn refreshTabButtons(char const*, char const*);\n    PAD = win 0x48;")
+    alpha_patch_class(GeometryDash GameSettingsLayer
+        "    TodoReturn toggleVisibility(bool);"
+        "    TodoReturn toggleVisibility(bool);\n    GJBaseGameLayer* m_gameLayer;\n    PAD = win 0x68;")
+    alpha_patch_class(GeometryDash LevelBrowserLayer
+        "    bool m_cached;" "    bool m_cached;\n    PAD = win 0x28;")
+
+    # These native entry points are scalar deleting destructors. Pass zero
+    # explicitly to retain the allocation, then use the SDK's destructor lock
+    # protocol to avoid destroying native members and bases a second time.
+    function(alpha_patch_deleting_destructor class address)
+        alpha_patch_class(GeometryDash "${class}"
+            "~${class}() = win ${address}" "~${class}() = win inline")
+        set(alpha_destructor_source "#include <Geode/binding/${class}.hpp>\n#include <Geode/modify/Traits.hpp>\n\n#ifdef GEODE_IS_WINDOWS\n${class}::~${class}() {\n    if (!geode::DestructorLock::isLocked(this)) {\n        using FunctionType = void(*)(${class}*, unsigned int);\n        reinterpret_cast<FunctionType>(geode::base::get() + ${address})(this, 0);\n        new (this) ${class}(geode::CutoffConstructor, sizeof(${class}));\n        geode::DestructorLock::addLock(this);\n    }\n}\n#endif\n")
+        file(WRITE "${alpha_bindings_output}/inline/${class}.cpp" "${alpha_destructor_source}")
+    endfunction()
+    alpha_patch_deleting_destructor(TabbedPopupLayer 0x19cd00)
+    alpha_patch_deleting_destructor(GameSettingsLayer 0x2c2530)
+endif()
+
 # GJRequestCell's native init is 0x158d20 (primary vtable 0x73cef0).
 # Its allocation is 0x248: score at 0x230, toggler at 0x238 and the
 # request-status-four flag at 0x240. The old popup callbacks have no native

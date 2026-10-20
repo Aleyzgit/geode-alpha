@@ -40,7 +40,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-78 checks cover native constructors, level/list cache fixtures, fresh/expired
+86 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -103,6 +103,27 @@ explicitly disabled counter. GJBaseGameLayer::updateCounters uses 0x33cb90 and
 the label map at 0x1118. An actual counter object created in a temporary editor
 checks text updates, the native 999999999 upper limit, negative values, absent
 item IDs and the label's update lock.
+
+A local compiled-member-pointer audit compared 2,148 known mapped virtual
+methods across 461 classes with native RTTI tables. All matched after correcting
+84 slot or base-offset disagreements. GManager's save callbacks precede its
+load callbacks; the gameplay hitbox callbacks precede section/group methods.
+Custom SFX and table-cell callbacks use the current native order and bool/int
+return types. Runtime fixtures check derived editor dispatch and typed delegate
+callbacks. The audit excludes unmapped methods, overloads and classes without
+available native RTTI; it does not establish complete SDK compatibility.
+
+TabbedPopupLayer reserves 0x430 bytes, GameSettingsLayer 0x4a8,
+LevelBrowserLayer 0x348 and LevelListLayer 0x408. Their inherited delegate
+offsets follow these native base allocations. The settings layer's game pointer
+is at 0x438. Opaque tab/browser state remains allocated without guessing its
+container element types. TabbedPopupLayer and GameSettingsLayer invoke their
+native deleting-destructor entry points with flags zero and follow the SDK's
+destructor-lock protocol to prevent a second native destruction. Fixtures
+exercise SDK-derived tab/browser construction and destruction boundaries, plus
+native game-settings creation, tab selection and dropdown delegate dispatch.
+Generated state-header dependencies are included explicitly so that changing
+unity source order does not conceal missing map, array or cocos type includes.
 
 Additional fixtures exercise achievement/download lookups, username and ID
 caches, coin/completion namespaces, color interpolation, hue matrices, animation
