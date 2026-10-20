@@ -64,9 +64,9 @@ The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
 The GJGameLevel layout and editor build statistics now use the newer upstream
 bindings, including corrected level-browser, slider and secret-level methods.
-Ninety-four Windows binding placeholders have been resolved; **118 remain**
+**82 Windows native-address placeholders remain**
 in the pinned game declarations. The engine declarations have no remaining
-Windows placeholders. Fifteen other unsafe or incorrect entries have been corrected,
+Windows placeholders. Additional unsafe or incorrect entries have been corrected,
 including PVR functions that previously pointed outside executable memory.
 GameLevelManager and GJLevelList now use corrected Windows layouts and native
 construction. Mod data is saved before async shutdown, preventing a later
@@ -84,7 +84,7 @@ convert old DLLs. Some mods need to be rebuilt or ported by their authors.
 Platform checks and package hash checks remain enabled.
 
 Build with Clang and the normal upstream CMake workflow. Bindings are pinned
-to `19c6429ab446054d98d84393378e9675f4d80607`; the fork's verified native
+to `ae234b568310731bcf6453f846826a1e772eb6db`; the fork's verified native
 address corrections are applied in the build directory. To reject a build
 while Windows placeholders remain, configure with
 `-DGEODE_ALPHA_REQUIRE_COMPLETE_BINDINGS=ON`. This check is expected to fail
@@ -110,7 +110,7 @@ request IDs and manager delegate layout match these native dispatch paths.
 Key binding queries use typed integer vectors and the native virtual-method
 order. Further fixtures exercise image-button sizing, popup factories, text
 input state and construction/destruction of editor and scroll bases.
-All 5,279 populated generated wrappers point into executable
+All 5,434 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its

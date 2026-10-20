@@ -5,18 +5,20 @@ This port is tested against GD 2.2091 EXE SHA-256
 and engine SHA-256
 `79c2f6567e5851225520803f460c6c5f6f49a2eac9afb8f3bd88d4c5697bef4e`.
 
-`cmake/AlphaWindowsAddresses.cmake` resolves 91 of the previous 209 Windows
-placeholders, adds the native GameLevelManager constructor and corrects fifteen
-previously populated addresses. It verifies each expected source declaration
-before patching the build copy. Game and engine RVAs use their respective
-modules. The remaining 118 Windows placeholders are in GeometryDash.bro;
-the engine declarations have no remaining Windows placeholders. This count
-does not establish completeness of class layouts or SDK implementations.
+`cmake/AlphaWindowsAddresses.cmake` overlays verified addresses, class layouts
+and interfaces on the pinned upstream declarations. It verifies each expected
+source declaration before patching the build copy, or accepts the exact same
+correction when upstream already contains it. Game and engine RVAs use their
+respective modules. The remaining 82 Windows address placeholders are in
+GeometryDash.bro; the engine declarations have no remaining Windows address
+placeholders. This count does not establish completeness of class layouts or
+SDK implementations. Some removed native Windows classes, including
+MoreOptionsLayer, have no usable Windows implementation in the current game.
 
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
-`19c6429ab446054d98d84393378e9675f4d80607`. The generated Windows build has
-5,279 populated native wrappers, all pointing into executable sections of
+`ae234b568310731bcf6453f846826a1e772eb6db`. The generated Windows build has
+5,434 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The GameLevelManager allocation is 0x690 bytes. Constructor initialization,
