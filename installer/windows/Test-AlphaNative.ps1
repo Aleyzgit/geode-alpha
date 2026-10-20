@@ -24,7 +24,28 @@ $expected = @(
     'Boolean setting activation',
     'Incompatible version gates',
     'Invalid platform rejected',
-    'Async mod save'
+    'Async mod save',
+    'Native achievement lookup',
+    'Native animation cache',
+    'Native download state',
+    'Native saved lists',
+    'Native user coin state',
+    'Native completed level keys',
+    'Native secret chests',
+    'Native oriented bounds',
+    'Native item counts',
+    'Native audio state and channels',
+    'Native coin key namespaces',
+    'Native pulse colors',
+    'Native editor object offsets',
+    'Native scroll pages and dots',
+    'Native user identity caches',
+    'Native setup dictionaries',
+    'Native color interpolation',
+    'Native color channel labels',
+    'Native hue color matrix',
+    'Native animation priority',
+    'Native completion reset'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {

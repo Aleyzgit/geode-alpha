@@ -120,7 +120,7 @@ alpha_patch_class(GeometryDash GameLevelManager
     "    PAD = win 0x24;\n    cocos2d::CCDictionary* m_gauntletLevels;")
 alpha_patch_class(GeometryDash GameLevelManager
     "    cocos2d::CCDictionary* m_storedLevels;"
-    "    PAD = win 0x40;\n    cocos2d::CCDictionary* m_storedLevels;")
+    "    std::unordered_map<int, std::string> m_usernameForAccountID;\n    cocos2d::CCDictionary* m_storedLevels;")
 alpha_patch_class(GeometryDash GameLevelManager
     "    std::string m_searchKey;"
     "    PAD = win 0x18;\n    std::string m_searchKey;")
@@ -183,3 +183,157 @@ alpha_patch_address(Cocos2d cocos2d::CCTexturePVR
     "bool unpackPVRv2Data(unsigned char*, unsigned int)" 0xadc60)
 alpha_patch_address(Cocos2d cocos2d::CCTexturePVR
     "bool unpackPVRv3Data(unsigned char*, unsigned int)" 0xadea0 0x144880)
+
+# The old implementations share a dictionary lookup at this + 0x148. The
+# corresponding current callers and native fixtures confirm both aliases.
+alpha_patch_address(GeometryDash AchievementManager
+    "cocos2d::CCDictionary* getAchievementsWithID(char const* id)" 0x3c560)
+alpha_patch_address(GeometryDash MusicDownloadManager
+    "cocos2d::CCObject* getDLObject(char const* id)" 0x3c560)
+alpha_patch_address(GeometryDash MusicDownloadManager
+    "void removeDLFromActive(char const* tag)" 0x4843c0)
+# Installs CCAnimateFrameCache's RTTI table and retains its three dictionaries.
+alpha_patch_address(GeometryDash CCAnimateFrameCache
+    "static CCAnimateFrameCache* sharedSpriteFrameCache()" 0x44fe0)
+# Native local-list insertion, saved-list dictionary (0x370), download flags
+# (0x378). GJLevelList's ID is at 0x158; its editor type is at 0x248.
+alpha_patch_address(GeometryDash GameLevelManager
+    "GJLevelList* createNewLevelList()" 0x21cb30)
+alpha_patch_address(GeometryDash GameLevelManager
+    "void saveLevelList(GJLevelList* list)" 0x22e290)
+alpha_patch_address(GeometryDash GameLevelManager
+    "bool hasDownloadedLevel(int id)" 0x233a80)
+# Dictionary lookups at 0x2c8/0x2d0/0x2d8/0x360. Secret coins use the
+# player-stat dictionary at 0x240 and the unique_%s prefix. The key builder
+# preserves n_/c_/d_/g_/e_ namespaces for main/online/daily/gauntlet/event.
+alpha_patch_address(GeometryDash GameStatsManager
+    "std::string getLevelKey(int levelID, bool isOnline, bool isDaily, bool isGauntlet, bool isEvent)" 0x2e1530)
+alpha_patch_address(GeometryDash GameStatsManager
+    "bool hasCompletedLevel(GJGameLevel* level)" 0x2e17a0)
+alpha_patch_address(GeometryDash GameStatsManager
+    "bool hasUserCoin(char const* key)" 0x2e3630)
+alpha_patch_address(GeometryDash GameStatsManager
+    "bool hasPendingUserCoin(char const* key)" 0x2e37d0)
+alpha_patch_address(GeometryDash GameStatsManager
+    "bool hasSecretCoin(char const* key)" 0x2e38a0)
+alpha_patch_address(GeometryDash GameStatsManager
+    "bool isSecretChestUnlocked(int id)" 0x2eec60)
+# SAT projections over native OBB corners/axes, and integer hash lookup with
+# item IDs clamped to [0, 9999]. Both are exercised by native fixtures.
+alpha_patch_address(GeometryDash OBB2D
+    "bool overlaps1Way(OBB2D* other)" 0x7bb70)
+alpha_patch_address(GeometryDash GJEffectManager
+    "int countForItem(int id)" 0x36cb70)
+
+# FMODAudioEngine's RTTI table is 0x70e200. Native singleton creation allocates
+# 0x8a8 and calls 0x5bf90; 0x114ba0 constructs a different class. The new
+# channel group precedes m_lastResult, and native state starts at 0x290.
+alpha_patch_address(GeometryDash FMODAudioEngine
+    "FMODAudioEngine()" 0x5bf90 0x114ba0)
+alpha_patch_class(GeometryDash FMODAudioEngine
+    "    FMOD_RESULT m_lastResult;"
+    "    PAD = win 0x8;\n    FMOD_RESULT m_lastResult;")
+alpha_patch_class(GeometryDash FMODAudioEngine
+    "    FMODAudioState m_audioState;"
+    "    PAD = win 0x18;\n    FMODAudioState m_audioState;")
+# Native channel tables at 0x668 and 0x730; stop paths use those tables and
+# the channel groups at 0x808/0x848. Queries are tested with isolated maps.
+alpha_patch_address(GeometryDash FMODAudioEngine
+    "FMOD::Channel* channelForChannelID(int id)" 0x60f50)
+alpha_patch_address(GeometryDash FMODAudioEngine
+    "int channelIDForUniqueID(int id)" 0x60e90)
+alpha_patch_address(GeometryDash FMODAudioEngine
+    "void stopAllEffects()" 0x62520)
+alpha_patch_address(GeometryDash FMODAudioEngine
+    "void stopChannel(int id, AudioTargetType type, bool loop, float delay)" 0x61010)
+
+# This value class already constructs its C++ containers before the body.
+# Native 0x5bdc0 initializes the same containers and zeros the first two floats;
+# calling it from the body would construct containers twice and leak storage.
+alpha_patch_class(GeometryDash FMODAudioState
+    "    FMODAudioState() = win 0x9999999, inline;"
+    "    FMODAudioState() = inline;")
+set(alpha_audio_inline "${alpha_bindings_output}/inline/FMODAudioState.cpp")
+file(READ "${alpha_audio_inline}" alpha_audio_content)
+set(alpha_audio_before "#if defined(GEODE_IS_MACOS) || defined(GEODE_IS_ANDROID)")
+string(FIND "${alpha_audio_content}" "${alpha_audio_before}" alpha_audio_match)
+if (alpha_audio_match LESS 0)
+    message(FATAL_ERROR "Unexpected FMODAudioState constructor implementation")
+endif()
+string(REPLACE "${alpha_audio_before}"
+    "#if defined(GEODE_IS_MACOS) || defined(GEODE_IS_ANDROID) || defined(GEODE_IS_WINDOWS)"
+    alpha_audio_content "${alpha_audio_content}")
+file(CONFIGURE OUTPUT "${alpha_audio_inline}" CONTENT "${alpha_audio_content}" @ONLY)
+
+# The two-argument thunk supplies the level's daily ID to the shared native
+# three-argument formatter; calling 0x264630 directly leaves that ID undefined.
+alpha_patch_address(GeometryDash GJGameLevel
+    "char const* getCoinKey(int coinNumber)" 0x264610)
+# Pulse strength/type/color fields at 0x18/0x20/0x1c; group colors are guarded
+# by the native bit vector and use the pulse-action map. Checked with fixtures.
+alpha_patch_address(GeometryDash GJEffectManager
+    "cocos2d::ccColor3B colorForPulseEffect(cocos2d::ccColor3B const& color, PulseEffectAction* action)" 0x36bfb0)
+alpha_patch_address(GeometryDash GJEffectManager
+    "cocos2d::ccColor3B colorForGroupID(int id, cocos2d::ccColor3B const& color, bool mainColor)" 0x36c350)
+
+# The old function takes (this, result, ID); current 0x19f3e0 takes only
+# (result, ID). Both switch over object IDs and construct the output CCPoint.
+# Preserve correct native parameter placement by declaring the current API static.
+alpha_patch_class(GeometryDash EditorUI
+    "    cocos2d::CCPoint offsetForKey(int id) = win 0x9999999;"
+    "    static cocos2d::CCPoint offsetForKey(int id) = win 0x19f3e0;")
+# Native factory installs BoomScrollLayer's RTTI tables and calls init 0x40b60.
+# The dots updater uses its 0x1a0 array and page state, matching its eight callers.
+alpha_patch_address(GeometryDash BoomScrollLayer
+    "static BoomScrollLayer* create(cocos2d::CCArray* pages, int offset, bool looped, cocos2d::CCArray* dynamicObjects, DynamicScrollDelegate* delegate)" 0x40960)
+alpha_patch_address(GeometryDash BoomScrollLayer
+    "void updateDots(float dt)" 0x41290)
+
+# Active-download dictionary at 0x4a8; username storage updates the account
+# map at 0x440 and the known-user / reciprocal ID dictionaries at 0x428-0x438.
+alpha_patch_address(GeometryDash GameLevelManager
+    "void removeDLFromActive(char const* key)" 0x221b70)
+alpha_patch_address(GeometryDash GameLevelManager
+    "void storeUserName(int userID, int accountID, std::string userName)" 0x21d580)
+# Alternating comma-delimited key/value tokens. Odd token counts return null.
+alpha_patch_address(GeometryDash GameToolbox
+    "static cocos2d::CCDictionary* stringSetupToDict(std::string const& str, char const* separator)" 0x6fd10)
+
+# Native interpolation stops when paused/finished and updates RGB and opacity.
+alpha_patch_address(GeometryDash ColorAction
+    "void step(float dt)" 0x3633f0)
+alpha_patch_address(GeometryDash ColorChannelSprite
+    "void updateBlending(bool enabled)" 0x363180)
+alpha_patch_address(GeometryDash ColorChannelSprite
+    "void updateCopyLabel(int channelID, bool copyColorLoop)" 0x362e60)
+alpha_patch_address(GeometryDash CCSpriteWithHue
+    "void updateColorMatrix()" 0x4ca60)
+# 0x4c570 is a deleting destructor with an extra EDX flags argument. Its
+# non-deleting behavior only calls CCSprite's destructor, so use normal C++
+# base destruction rather than invoking that entry with undefined flags.
+alpha_patch_class(GeometryDash CCSpriteWithHue
+    "    virtual ~CCSpriteWithHue() = win 0x4c570;"
+    "    virtual ~CCSpriteWithHue() = win inline;")
+file(APPEND "${alpha_bindings_output}/inline/CCSpriteWithHue.cpp"
+    "\n#ifdef GEODE_IS_WINDOWS\nCCSpriteWithHue::~CCSpriteWithHue() {}\n#endif\n")
+# Moves current -> next unless current is already the native not_used sentinel.
+alpha_patch_address(GeometryDash SpriteAnimationManager
+    "void overridePrio()" 0x87400)
+# Its SDK constructor omitted an owned dictionary that its destructor releases.
+# A bare create/destroy fixture reproduced CCObject::release on garbage memory.
+set(alpha_animation_inline "${alpha_bindings_output}/inline/SpriteAnimationManager.cpp")
+file(READ "${alpha_animation_inline}" alpha_animation_content)
+set(alpha_animation_before "    m_soundDict = nullptr;\n    m_frameDict = nullptr;")
+string(FIND "${alpha_animation_content}" "${alpha_animation_before}" alpha_animation_match)
+if (alpha_animation_match LESS 0)
+    message(FATAL_ERROR "Unexpected SpriteAnimationManager constructor implementation")
+endif()
+string(REPLACE "${alpha_animation_before}"
+    "${alpha_animation_before}\n    m_animateDict = nullptr;"
+    alpha_animation_content "${alpha_animation_content}")
+file(CONFIGURE OUTPUT "${alpha_animation_inline}" CONTENT "${alpha_animation_content}" @ONLY)
+# Native completion reset removes level, star and demon keys from 0x2c8.
+alpha_patch_address(GeometryDash GameStatsManager
+    "void uncompleteLevel(GJGameLevel* level)" 0x2e2450)
+alpha_patch_address(GeometryDash GameStatsManager
+    "std::string getPathRewardKey(int id)" 0x2ee970)

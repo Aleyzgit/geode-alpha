@@ -64,13 +64,16 @@ The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
 The GJGameLevel layout and editor build statistics now use the newer upstream
 bindings, including corrected level-browser, slider and secret-level methods.
-Thirty-three Windows binding placeholders have been resolved; **179 remain**
+Sixty-nine Windows binding placeholders have been resolved; **143 remain**
 in the pinned game declarations. The engine declarations have no remaining
-Windows placeholders. Nine other incorrect addresses have been corrected,
+Windows placeholders. Eleven other unsafe or incorrect entries have been corrected,
 including PVR functions that previously pointed outside executable memory.
 GameLevelManager and GJLevelList now use corrected Windows layouts and native
 construction. Mod data is saved before async shutdown, preventing a later
 native save from invoking mods after their runtime has stopped.
+The audio engine's constructor, state layout and channel lookups are corrected;
+the animation manager initializes the dictionary released by its destructor.
+The editor's object-offset helper now uses its native static calling convention.
 Unsupported hooks report an error instead of claiming successful activation.
 Native class layouts and SDK interfaces also change between versions.
 
@@ -95,10 +98,13 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. Seventeen native checks passed in both
+Windows validation used Clang 21.1.8. Thirty-eight native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
-header rejection. All 5,228 populated generated wrappers point into executable
+header rejection. Additional fixtures exercise native audio state and channels,
+identity caches, completion resets, coin namespaces, color interpolation, hue
+matrices, animation priority, editor offsets and scroll indicators.
+All 5,262 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its

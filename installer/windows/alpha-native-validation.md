@@ -5,18 +5,18 @@ This port is tested against GD 2.2091 EXE SHA-256
 and engine SHA-256
 `79c2f6567e5851225520803f460c6c5f6f49a2eac9afb8f3bd88d4c5697bef4e`.
 
-`cmake/AlphaWindowsAddresses.cmake` resolves 30 of the previous 209 Windows
-placeholders, adds the native GameLevelManager constructor and corrects nine
+`cmake/AlphaWindowsAddresses.cmake` resolves 66 of the previous 209 Windows
+placeholders, adds the native GameLevelManager constructor and corrects eleven
 previously populated addresses. It verifies each expected source declaration
 before patching the build copy. Game and engine RVAs use their respective
-modules. The remaining 179 Windows placeholders are in GeometryDash.bro;
+modules. The remaining 143 Windows placeholders are in GeometryDash.bro;
 the engine declarations have no remaining Windows placeholders. This count
 does not establish completeness of class layouts or SDK implementations.
 
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
 `19c6429ab446054d98d84393378e9675f4d80607`. The generated Windows build has
-5,228 populated native wrappers, all pointing into executable sections of
+5,262 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The GameLevelManager allocation is 0x690 bytes. Constructor initialization,
@@ -32,12 +32,35 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-17 checks cover native constructors, level/list cache fixtures, fresh/expired
+38 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
 temporary manager fields before saving. A loader test token is persisted in
 the private profile. These checks do not exercise every game or mod feature.
+
+Additional fixtures exercise achievement/download lookups, username and ID
+caches, coin/completion namespaces, color interpolation, hue matrices, animation
+priority, static editor offsets and scroll indicator placement. The native
+GameLevelManager account-name map is exposed at 0x440 with its tested layout.
+
+FMODAudioEngine's native constructor is 0x5bf90, with allocation size 0x8a8;
+the previous SDK address constructed a different class. Its audio state starts
+at 0x290, and its channel maps are at 0x668 and 0x730. The value-class
+FMODAudioState initializes its containers through normal C++ construction and
+zeros its timing fields, matching native 0x5bdc0 without constructing containers
+twice. Audio tests include lookup misses and channel/effect stopping.
+
+The SDK SpriteAnimationManager constructor previously left m_animateDict
+uninitialized. A native create/destroy fixture reproduced a CCObject::release
+access violation; initializing the owned pointer fixes that same fixture.
+CCSpriteWithHue uses ordinary base destruction because its old Windows entry
+was a deleting destructor requiring an additional flags argument. Its matrix
+test constructs and destroys an actual SDK object.
+
+EditorUI::offsetForKey is static in this game version: native 0x19f3e0 receives
+the result buffer and object ID, whereas the older version also received this.
+The generated API and tests use the current calling convention.
 
 ## Existing Geode 5 mods
 

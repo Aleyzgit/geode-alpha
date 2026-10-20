@@ -330,7 +330,7 @@ function(package_geode_resources_now proname src dest header_dest)
             function properly"
         )
         set(HEADER_FILE
-            "#include <unordered_map>\n\n"
+            "#pragma once\n#include <unordered_map>\n\n"
             "static const std::unordered_map<std::string, std::string> "
             "LOADER_RESOURCE_HASHES {}\;\n"
         )
@@ -366,7 +366,7 @@ function(package_geode_resources_now proname src dest header_dest)
     file(GLOB RESOURCE_FILES "${dest}/*.*")
 
     set(HEADER_FILE
-        "#include <unordered_map>\n\n"
+        "#pragma once\n#include <unordered_map>\n\n"
         "static const std::unordered_map<std::string, std::string> "
         "LOADER_RESOURCE_HASHES {\n"
         # "#include <vector>\n\n"
