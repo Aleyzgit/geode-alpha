@@ -3,6 +3,7 @@
 #include <Geode/binding/ButtonSprite.hpp>
 #include <Geode/binding/BrowseSmartTemplateLayer.hpp>
 #include <Geode/binding/CCAnimateFrameCache.hpp>
+#include <Geode/binding/CCCounterLabel.hpp>
 #include <Geode/binding/CCMenuItemToggler.hpp>
 #include <Geode/binding/CCSpriteWithHue.hpp>
 #include <Geode/binding/ColorAction.hpp>
@@ -29,6 +30,7 @@
 #include <Geode/binding/LocalLevelManager.hpp>
 #include <Geode/binding/KeybindSet.hpp>
 #include <Geode/binding/LevelUploadDelegate.hpp>
+#include <Geode/binding/LabelGameObject.hpp>
 #include <Geode/binding/LevelEditorLayer.hpp>
 #include <Geode/binding/LevelSearchLayer.hpp>
 #include <Geode/binding/MusicDownloadManager.hpp>
@@ -1081,6 +1083,46 @@ $on_game(Loaded) {
         return popup && popup->m_inputLabel && popup->m_titleLabel && popup->m_okButton &&
             !popup->m_inputPrefix.empty() &&
             std::string(popup->m_inputLabel->getString()) == popup->m_inputPrefix + popup->m_inputString;
+    });
+
+    runBindingTest("Native animated counter updates", [] {
+        if (sizeof(CCCounterLabel) != 0x238 || offsetof(CCCounterLabel, m_stepSize) != 0x218) return false;
+        auto label = CCCounterLabel::create(0, "bigFont.fnt", FormatterType::Integer);
+        if (!label) return false;
+        label->m_dontSchedule = true;
+        label->setTargetCount(25);
+        for (int frame = 0; frame < 20; ++frame) label->updateCounter(1.f / 30.f);
+        if (label->m_currentCount != 25 || label->m_counterEnabled ||
+            std::string(label->getString()) != "25") return false;
+        label->setTargetCount(-7);
+        for (int frame = 0; frame < 20; ++frame) label->updateCounter(1.f / 30.f);
+        if (label->m_currentCount != -7 || label->m_counterEnabled ||
+            std::string(label->getString()) != "-7") return false;
+        label->m_targetCount = 99;
+        label->updateCounter(1.f / 30.f);
+        return label->m_currentCount == -7;
+    });
+
+    runBindingTest("Native gameplay counter labels", [] {
+        return withNativeEditor(false, [](LevelEditorLayer* editor) {
+            auto object = editor->createObject(1615, CCPoint { 30.f, 30.f }, true);
+            auto label = typeinfo_cast<LabelGameObject*>(object);
+            if (!label) return false;
+            std::unordered_map<int, std::vector<LabelGameObject*>> fixture { { 717171, { label } } };
+            AlphaTestField labels(editor->m_labelObjects, std::move(fixture));
+            AlphaTestField update(label->m_updateLabel, false);
+            label->m_labelDirty = false;
+            editor->updateCounters(717171, 42);
+            if (!label->m_labelDirty || label->m_labelString != "42") return false;
+            editor->updateCounters(717171, 1000000000);
+            if (label->m_labelString != "999999999") return false;
+            editor->updateCounters(717171, -17);
+            if (label->m_labelString != "-17") return false;
+            label->m_updateLabel = true;
+            editor->updateCounters(717171, 99);
+            editor->updateCounters(717172, 11);
+            return label->m_labelString == "-17" && editor->m_labelObjects.size() == 1;
+        });
     });
 }
 #ifdef __clang__

@@ -83,7 +83,9 @@ $expected = @(
     'Native number input layout',
     'Native number input construction boundary',
     'Native number input controls and delegate',
-    'Native arithmetic gate construction'
+    'Native arithmetic gate construction',
+    'Native animated counter updates',
+    'Native gameplay counter labels'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {

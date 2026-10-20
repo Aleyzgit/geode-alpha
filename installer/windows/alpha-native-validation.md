@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 62 Windows address placeholders are in
+respective modules. The remaining 60 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
 `d6f3312f0886b2c285fd0d2593ebabdc03b6ca0c`. The generated Windows build has
-5,459 populated native wrappers, all pointing into executable sections of
+5,461 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The updated upstream declarations include the current gameplay-layer state
@@ -40,7 +40,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-76 checks cover native constructors, level/list cache fixtures, fresh/expired
+78 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -96,6 +96,13 @@ slot at 0x438 uses 0x4a1b10. Tests exercise long-string destruction, editing,
 length bounds, label text and a temporary completion receiver.
 ParentalGateLayer reserves 0x308 bytes and its native factory is 0x4d3ba0;
 only construction is tested, without submitting an answer or changing settings.
+
+CCCounterLabel::setTargetCount schedules native updateCounter at 0x46ee0.
+The fixture checks increasing/decreasing counts, completed counters and an
+explicitly disabled counter. GJBaseGameLayer::updateCounters uses 0x33cb90 and
+the label map at 0x1118. An actual counter object created in a temporary editor
+checks text updates, the native 999999999 upper limit, negative values, absent
+item IDs and the label's update lock.
 
 Additional fixtures exercise achievement/download lookups, username and ID
 caches, coin/completion namespaces, color interpolation, hue matrices, animation

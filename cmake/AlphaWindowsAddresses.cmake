@@ -709,6 +709,14 @@ alpha_patch_address(GeometryDash NumberInputLayer
     "void onNumber(cocos2d::CCObject* sender)" 0x4a1820 0x2157c0)
 alpha_patch_address(GeometryDash NumberInputLayer "void updateNumberState()" 0x4a1990)
 
+# setTargetCount schedules this exact update callback at 30 Hz. The native
+# body advances the count toward its target and disables completed counters.
+alpha_patch_address(GeometryDash CCCounterLabel "void updateCounter(float dt)" 0x46ee0)
+# Four matched callers update label objects through the map at 0x1118. Native
+# formatting caps values at 999999999 and respects the label's update lock.
+alpha_patch_address(GeometryDash GJBaseGameLayer
+    "void updateCounters(int itemId, int value)" 0x33cb90)
+
 # GJRequestCell's native init is 0x158d20 (primary vtable 0x73cef0).
 # Its allocation is 0x248: score at 0x230, toggler at 0x238 and the
 # request-status-four flag at 0x240. The old popup callbacks have no native
