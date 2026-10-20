@@ -75,7 +75,9 @@ $expected = @(
     'Native reward stat keys',
     'Native cached user lists',
     'Native editor layer layout',
-    'Native editor construction boundary'
+    'Native editor construction boundary',
+    'Native fresh editor construction',
+    'Native editor object creation and removal'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {

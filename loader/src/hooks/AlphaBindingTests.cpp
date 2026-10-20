@@ -13,6 +13,7 @@
 #include <Geode/binding/EditorWindowPopup.hpp>
 #include <Geode/binding/FMODAudioEngine.hpp>
 #include <Geode/binding/GameLevelManager.hpp>
+#include <Geode/binding/GameManager.hpp>
 #include <Geode/binding/GameStatsManager.hpp>
 #include <Geode/binding/GameToolbox.hpp>
 #include <Geode/binding/GJEffectManager.hpp>
@@ -43,6 +44,7 @@
 #include <Geode/binding/UploadActionPopup.hpp>
 #include <Geode/cocos/particle_nodes/CCParticleSystemQuad.h>
 #include <Geode/cocos/CCScheduler.h>
+#include <Geode/cocos/cocoa/CCAutoreleasePool.h>
 #include <Geode/loader/GameEvent.hpp>
 #include <Geode/loader/Loader.hpp>
 
@@ -170,6 +172,38 @@ namespace {
             log::info("[ALPHA TEST] {} exception: {}", name, error.what());
         }
         log::info("[ALPHA TEST] {}: {}", name, passed ? "PASS" : "FAIL");
+    }
+
+    template <class F>
+    bool withNativeEditor(bool noUI, F test) {
+        auto manager = GameManager::get();
+        if (manager->m_levelEditorLayer || manager->m_playLayer) return false;
+        AlphaTestField editorState(manager->m_levelEditorLayer, manager->m_levelEditorLayer);
+        AlphaTestField sceneState(manager->m_sceneEnum, manager->m_sceneEnum);
+        auto local = LocalLevelManager::get();
+        AlphaTestField levels(local->m_localLevels, CCArray::create());
+        auto music = MusicDownloadManager::sharedState();
+        // Native init checks this library-request flag before making requests.
+        auto& librariesRequested = *reinterpret_cast<bool*>(reinterpret_cast<uint8_t*>(music) + 0x205);
+        AlphaTestField libraryState(librariesRequested, true);
+        auto audio = FMODAudioEngine::sharedEngine();
+        auto& editorAudio = *reinterpret_cast<bool*>(reinterpret_cast<uint8_t*>(audio) + 0x272);
+        AlphaTestField audioState(editorAudio, editorAudio);
+        bool valid = false;
+        {
+            auto pool = CCPoolManager::sharedPoolManager();
+            pool->push();
+            auto pop = [](CCPoolManager* value) { value->pop(); };
+            std::unique_ptr<CCPoolManager, decltype(pop)> scope(pool, pop);
+            auto level = GameLevelManager::sharedState()->createNewLevel();
+            auto editor = level ? LevelEditorLayer::create(level, noUI) : nullptr;
+            valid = editor && editor->m_level == level && editor->m_levelSettings &&
+                editor->m_objects && editor->m_undoObjects && editor->m_redoObjects &&
+                editor->m_savedPositions.size() == 10 && test(editor);
+            if (editor) editor->cleanup();
+            local->m_localLevels->removeAllObjects();
+        }
+        return valid && !manager->m_levelEditorLayer;
     }
 }
 
@@ -909,6 +943,28 @@ $on_game(Loaded) {
         editor.reset();
         return valid && std::all_of(storage.begin() + sizeof(LevelEditorLayer), storage.end(),
             [](uint8_t value) { return value == 0xa5; });
+    });
+
+    runBindingTest("Native fresh editor construction", [] {
+        return withNativeEditor(true, [](LevelEditorLayer* editor) {
+            return !editor->m_editorUI;
+        }) && withNativeEditor(false, [](LevelEditorLayer* editor) {
+            return editor->m_editorUI && editor->m_editorUI->m_editorLayer == editor &&
+                editor->m_editorUI->getChildrenCount() > 0;
+        });
+    });
+
+    runBindingTest("Native editor object creation and removal", [] {
+        return withNativeEditor(false, [](LevelEditorLayer* editor) {
+            auto count = editor->m_objects->count();
+            auto object = editor->createObject(1, CCPoint { 30.f, 30.f }, true);
+            if (!object || editor->m_objects->count() != count + 1) return false;
+            editor->removeSpecial(object);
+            editor->addSpecial(object);
+            bool position = editor->getLastObjectX() >= 30.f;
+            editor->removeObject(object, true);
+            return position && editor->m_objects->count() == count;
+        });
     });
 }
 #endif

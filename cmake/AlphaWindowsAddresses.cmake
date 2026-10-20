@@ -648,6 +648,9 @@ alpha_patch_address(GeometryDash LevelEditorLayer
 # EditorPauseLayer calls the same max-position scan as in the previous game.
 alpha_patch_address(GeometryDash LevelEditorLayer
     "float getLastObjectX()" 0x3fd290 0x36d6b0)
+# removeObject and twelve matched native callers unregister through this path.
+alpha_patch_address(GeometryDash LevelEditorLayer
+    "void removeSpecial(GameObject* object)" 0x3f5290)
 
 # GJRequestCell's native init is 0x158d20 (primary vtable 0x73cef0).
 # Its allocation is 0x248: score at 0x230, toggler at 0x238 and the
