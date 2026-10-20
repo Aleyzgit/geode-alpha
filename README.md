@@ -81,7 +81,7 @@ convert old DLLs. Some mods need to be rebuilt or ported by their authors.
 Platform checks and package hash checks remain enabled.
 
 Build with Clang and the normal upstream CMake workflow. Bindings are pinned
-to `cac7b26495124025212d0f5e4cf82bb43b8162e8`; the fork's verified native
+to `19c6429ab446054d98d84393378e9675f4d80607`; the fork's verified native
 address corrections are applied in the build directory. To reject a build
 while Windows placeholders remain, configure with
 `-DGEODE_ALPHA_REQUIRE_COMPLETE_BINDINGS=ON`. This check is expected to fail
@@ -98,7 +98,7 @@ experimental version-check behavior. Report fork-specific issues to
 Windows validation used Clang 21.1.8. Seventeen native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
-header rejection. All 5,199 populated generated wrappers point into executable
+header rejection. All 5,228 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its
