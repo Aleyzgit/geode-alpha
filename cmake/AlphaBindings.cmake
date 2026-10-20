@@ -42,6 +42,20 @@ if (NOT GEODE_BINDINGS_PATH)
     file(CONFIGURE OUTPUT "${alpha_bindings_output}/GeometryDash.bro"
         CONTENT "${alpha_bindings}" @ONLY)
     include("${CMAKE_CURRENT_LIST_DIR}/AlphaWindowsAddresses.cmake")
+    # Keep the fetched unversioned header intact. Windows request IDs changed
+    # when native APIs were inserted into the shared HTTP dispatch enum.
+    file(READ "${GEODE_BINDINGS_REPO_PATH}/bindings/include/Geode/Enums.hpp" alpha_enums)
+    file(READ "${CMAKE_CURRENT_LIST_DIR}/AlphaWindowsHttpTypes.hpp" alpha_http_types)
+    string(REGEX MATCH "enum class GJHttpType \\{[^}]*\\};" alpha_old_http_types "${alpha_enums}")
+    if (NOT alpha_old_http_types)
+        message(FATAL_ERROR "Missing upstream GJHttpType enum")
+    endif()
+    string(REPLACE "${alpha_old_http_types}"
+        "#ifdef GEODE_IS_WINDOWS\n${alpha_http_types}\n#else\n${alpha_old_http_types}\n#endif"
+        alpha_enums "${alpha_enums}")
+    set(GEODE_ALPHA_ENUMS_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/alpha-include")
+    file(CONFIGURE OUTPUT "${GEODE_ALPHA_ENUMS_INCLUDE}/Geode/Enums.hpp"
+        CONTENT "${alpha_enums}" @ONLY)
     set(GEODE_BINDINGS_PATH "${alpha_bindings_output}")
 endif()
 
@@ -62,6 +76,12 @@ foreach(alpha_binding_file IN LISTS alpha_binding_files)
 endforeach()
 option(GEODE_ALPHA_REQUIRE_COMPLETE_BINDINGS
     "Reject builds with unresolved Windows native addresses" OFF)
+# The Windows installer is a release artifact. Keep its completeness decision
+# tied to the same audited binding copy used by the loader build.
+if (NOT CMAKE_SCRIPT_MODE_FILE)
+    file(CONFIGURE OUTPUT "${CMAKE_CURRENT_LIST_DIR}/../bin/nightly/alpha-release-state.nsh"
+        CONTENT "!define ALPHA_UNRESOLVED_WINDOWS_BINDINGS @alpha_missing_count@\n" @ONLY)
+endif()
 if (alpha_missing_count GREATER 0)
     if (GEODE_ALPHA_REQUIRE_COMPLETE_BINDINGS)
         message(FATAL_ERROR "${alpha_missing_count} Windows bindings are unresolved")

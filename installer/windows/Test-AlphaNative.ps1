@@ -45,7 +45,13 @@ $expected = @(
     'Native color channel labels',
     'Native hue color matrix',
     'Native animation priority',
-    'Native completion reset'
+    'Native completion reset',
+    'Native options containers',
+    'Native particle numeric records',
+    'Native paged base construction',
+    'Native level upload callback',
+    'Native user info callback',
+    'Native admin queue callbacks'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {

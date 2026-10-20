@@ -2,9 +2,13 @@
     !include MUI2.nsh
     !include nsDialogs.nsh
     !include WinMessages.nsh
+    !include "..\..\bin\nightly\alpha-release-state.nsh"
+    !if ${ALPHA_UNRESOLVED_WINDOWS_BINDINGS} != 0
+        !error "Geode Alpha installer is blocked: unresolved Windows native bindings remain."
+    !endif
 
 ; settings
-    Name "Geode"
+    Name "Geode Alpha (Unofficial)"
     OutFile "geode-installer-win.exe"
     Unicode true
     InstallDir "$PROGRAMFILES32\Steam\steamapps\common\Geometry Dash\" ; set default path to the most common one
@@ -21,6 +25,7 @@
     !define MUI_FINISHPAGE_NOAUTOCLOSE
     !define MUI_UNFINISHPAGE_NOAUTOCLOSE
     !define MUI_FINISHPAGE_NOREBOOTSUPPORT
+    !define MUI_WELCOMEPAGE_TEXT "Geode Alpha is an unofficial fork developed with AI assistance.$\r$\n$\r$\nExisting mod packages and settings are preserved. Older binary mods require their matching game and Geode runtime; copying them does not convert them."
     !define MUI_ICON Graphics\logo_inst.ico
     !define MUI_UNICON Graphics\logo_uninst.ico
     !define MUI_WELCOMEFINISHPAGE_BITMAP Graphics\banner.bmp
@@ -493,6 +498,17 @@ SectionGroup "Geode"
         CreateDirectory $INSTDIR\geode\resources\geode.loader
         SetOutPath $INSTDIR\geode\resources\geode.loader
         File /r ${BINDIR}\resources\*
+    SectionEnd
+    Section "Alpha profile tools"
+        SectionIn RO
+        SetOutPath $INSTDIR\alpha-launcher
+        File Start-Alpha.ps1
+        File Start-Alpha.cmd
+        File Initialize-AlphaRuntimes.ps1
+        File Import-AlphaProfile.ps1
+        File Repair-AlphaMods.ps1
+        File alpha-runtimes.md
+        File alpha-native-validation.md
     SectionEnd
 SectionGroupEnd
 

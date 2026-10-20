@@ -112,7 +112,7 @@ alpha_patch_class(GeometryDash GameLevelManager
     "    GameLevelManager() = win 0x217310;\n    virtual ~GameLevelManager()")
 alpha_patch_class(GeometryDash GameLevelManager
     "    std::set<std::string> m_queuedLists;"
-    "    PAD = win 0x1f8;\n    std::set<std::string> m_queuedLists;")
+    "    PAD = win 0x1e8;\n    win {\n    LevelControlsDelegate* m_levelControlsDelegate;\n    }\n    PAD = win 0x8;\n    std::set<std::string> m_queuedLists;")
 alpha_patch_class(GeometryDash GameLevelManager
     "    int m_dailyTimeLeft;" "    PAD = win 0x4;\n    int m_dailyTimeLeft;")
 alpha_patch_class(GeometryDash GameLevelManager
@@ -125,8 +125,17 @@ alpha_patch_class(GeometryDash GameLevelManager
     "    std::string m_searchKey;"
     "    PAD = win 0x18;\n    std::string m_searchKey;")
 alpha_patch_class(GeometryDash GameLevelManager
-    "    SearchType m_searchType;"
-    "    PAD = win 0x48;\n    SearchType m_searchType;")
+    "    LevelUploadDelegate* m_levelUploadDelegate;"
+    "    win {\n    CommentAdminDelegate* m_commentAdminDelegate;\n    ThreadMessageDelegate* m_threadMessageDelegate;\n    }\n    LevelUploadDelegate* m_levelUploadDelegate;")
+alpha_patch_class(GeometryDash GameLevelManager
+    "    UserInfoDelegate* m_userInfoDelegate;"
+    "    win {\n    EditorSoundUploadDelegate* m_editorSoundUploadDelegate;\n    EditorSoundListDelegate* m_editorSoundListDelegate;\n    EditorSoundDownloadDelegate* m_editorSoundDownloadDelegate;\n    EditorSoundDeleteDelegate* m_editorSoundDeleteDelegate;\n    }\n    UserInfoDelegate* m_userInfoDelegate;")
+alpha_patch_class(GeometryDash GameLevelManager
+    "    OnlineListDelegate* m_onlineListDelegate;"
+    "    win {\n    GJContentStatusDelegate* m_contentStatusDelegate;\n    }\n    PAD = win 0x8;\n    OnlineListDelegate* m_onlineListDelegate;")
+alpha_patch_class(GeometryDash GameLevelManager
+    "    LevelRateInfoDelegate* m_levelRateInfoDelegate;"
+    "    LevelRateInfoDelegate* m_levelRateInfoDelegate;\n    win {\n    SongUsageDelegate* m_songUsageDelegate;\n    }")
 
 # ZeroConstructor cannot initialize the new native containers hidden in PAD.
 set(alpha_manager_inline "${alpha_bindings_output}/inline/GameLevelManager.cpp")
@@ -337,3 +346,84 @@ alpha_patch_address(GeometryDash GameStatsManager
     "void uncompleteLevel(GJGameLevel* level)" 0x2e2450)
 alpha_patch_address(GeometryDash GameStatsManager
     "std::string getPathRewardKey(int id)" 0x2ee970)
+
+# RTTI identifies the options constructor at 0x1800b0. Its native deleting
+# destructor allocates/frees 0x470, including the new trailing 0x40-byte map.
+alpha_patch_address(GeometryDash GJOptionsLayer
+    "GJOptionsLayer()" 0x1800b0)
+alpha_patch_class(GeometryDash GJOptionsLayer
+    "    float m_offset;" "    float m_offset;\n    PAD = win 0x40;")
+# The native base didToggleGV implementation (0x98e10) only destroys its string
+# argument. An empty C++ body performs that same argument cleanup automatically.
+alpha_patch_class(GeometryDash GJOptionsLayer
+    "    virtual void didToggleGV(std::string variable) = win 0x9999999, inline;"
+    "    virtual void didToggleGV(std::string variable) = inline;")
+file(APPEND "${alpha_bindings_output}/inline/GJOptionsLayer.cpp"
+    "\n#ifdef GEODE_IS_WINDOWS\nvoid GJOptionsLayer::didToggleGV(std::string variable) {}\n#endif\n")
+# Grow outer arrays at 0x380/0x390, returning a stable child array for the index.
+alpha_patch_address(GeometryDash SetupTriggerPopup
+    "cocos2d::CCArray* getPageContainer(int page)" 0x60b6f0)
+alpha_patch_address(GeometryDash SetupTriggerPopup
+    "cocos2d::CCArray* getGroupContainer(int group)" 0x60b970)
+# Parse the 'a'-separated numeric particle record. Native writes at 0..0x104
+# match ParticleStruct, and an empty input leaves the supplied struct unchanged.
+alpha_patch_address(GeometryDash GameToolbox
+    "static void particleStringToStruct(std::string const& str, cocos2d::ParticleStruct& particleStruct)" 0x71a40)
+
+# Native PagedListPopup initializes 0x298..0x307 before derived delegate bases.
+# Its primary RTTI table is 0x7214f8 and requestPage points to _purecall.
+alpha_patch_class(GeometryDash PagedListPopup
+    "    virtual ~PagedListPopup() = win 0xc2af0;"
+    "    PagedListPopup() = win 0xabc50;\n    virtual ~PagedListPopup() = win inline;")
+alpha_patch_class(GeometryDash PagedListPopup
+    "    virtual int requestPage(int) = win 0x9999999;"
+    "    inline virtual int requestPage(int) = 0;")
+alpha_patch_class(GeometryDash PagedListPopup
+    "    TodoReturn updatePageUI(int, int, int);"
+    "    TodoReturn updatePageUI(int, int, int);\n    PAD = win 0x70;")
+# Native non-deleting 0xc2af0 releases the object at 0x2b8, then destroys
+# FLAlertLayer. Normal C++ base destruction avoids reconstructing an abstract
+# PagedListPopup, which the generic generated destructor cannot do.
+file(CONFIGURE OUTPUT "${alpha_bindings_output}/inline/PagedListPopup.cpp"
+    CONTENT "#include <Geode/binding/PagedListPopup.hpp>\n\n#ifdef GEODE_IS_WINDOWS\nPagedListPopup::~PagedListPopup() {\n    auto owned = *reinterpret_cast<cocos2d::CCObject**>(reinterpret_cast<uintptr_t>(this) + 0x2b8);\n    CC_SAFE_RELEASE(owned);\n}\n#endif\n" @ONLY)
+# VirtualRowSource is an interface. All concrete native row sources implement
+# these three entries; mount takes index, node and menu, not an empty argument
+# list. Keep C++ dispatch compatible and require concrete subclasses to supply it.
+alpha_patch_class(GeometryDash VirtualRowSource
+    "    virtual int virtualRowCount() = win 0x9999999;"
+    "    inline virtual int virtualRowCount() = 0;")
+alpha_patch_class(GeometryDash VirtualRowSource
+    "    virtual int virtualRowHeight(int) = win 0x9999999;"
+    "    inline virtual int virtualRowHeight(int) = 0;")
+alpha_patch_class(GeometryDash VirtualRowSource
+    "    virtual void mountVirtualRow() = win 0x9999999;"
+    "    inline virtual void mountVirtualRow(int, cocos2d::CCNode*, cocos2d::CCMenu*) = 0;")
+
+# Native queue mute/unmute responses dispatch through 0xd0/0xd8/0xe0/0xe8.
+# These four interface entries precede history, shifting every later callback.
+alpha_patch_class(GeometryDash CommentAdminDelegate
+    "    virtual void adminUserHistoryFinished(int, cocos2d::CCArray*, int, int, int) = inline;"
+    "    win {\n    virtual void adminQueueMuteFinished() = inline;\n    virtual void adminQueueMuteFailed() = inline;\n    virtual void adminQueueUnmuteFinished() = inline;\n    virtual void adminQueueUnmuteFailed() = inline;\n    }\n    virtual void adminUserHistoryFinished(int, cocos2d::CCArray*, int, int, int) = inline;")
+file(APPEND "${alpha_bindings_output}/inline/CommentAdminDelegate.cpp"
+    "\n#ifdef GEODE_IS_WINDOWS\nvoid CommentAdminDelegate::adminQueueMuteFinished() {}\nvoid CommentAdminDelegate::adminQueueMuteFailed() {}\nvoid CommentAdminDelegate::adminQueueUnmuteFinished() {}\nvoid CommentAdminDelegate::adminQueueUnmuteFailed() {}\n#endif\n")
+# Native AccountReviewPopup secondary vtables: CommentAdmin at this+0x308,
+# Dropdown at this+0x328. Known finished callbacks anchor all failed slots.
+alpha_patch_address(GeometryDash AccountReviewPopup
+    "virtual void dropdownSelectionChanged(Dropdown*, int)" 0xb34a0)
+alpha_patch_address(GeometryDash AccountReviewPopup
+    "virtual void adminReportedContentFailed(int)" 0xb37d0)
+alpha_patch_address(GeometryDash AccountReviewPopup
+    "virtual void adminAbuseInfoFailed(int)" 0xb39a0)
+alpha_patch_address(GeometryDash AccountReviewPopup
+    "virtual void adminUserHistoryFailed(int)" 0xb3b40)
+
+# The native dispatch table forwards online levels to 0x22b650. The upstream
+# Windows entry 0x243180 is an unrelated admin-reported-content handler.
+alpha_patch_address(GeometryDash GameLevelManager
+    "void onGetOnlineLevelsCompleted(std::string response, std::string tag)" 0x22b650 0x243180)
+alpha_patch_class(GeometryDash GameLevelManager
+    "void onUploadLevelCompleted(std::string response, std::string tag);"
+    "void onUploadLevelCompleted(std::string response, std::string tag) = win 0x22a0b0;")
+alpha_patch_class(GeometryDash GameLevelManager
+    "void onGetGJUserInfoCompleted(std::string response, std::string tag) = imac"
+    "void onGetGJUserInfoCompleted(std::string response, std::string tag) = win 0x23a830, imac")

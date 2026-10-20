@@ -346,6 +346,9 @@ target_sources(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/entry.cpp)
 
 include(cmake/AlphaBindings.cmake)
 add_subdirectory(${GEODE_BINDINGS_REPO_PATH} ${CMAKE_BINARY_DIR}/bindings)
+if (GEODE_ALPHA_ENUMS_INCLUDE)
+	target_include_directories(GeodeBindings BEFORE PUBLIC ${GEODE_ALPHA_ENUMS_INCLUDE})
+endif()
 
 if (NOT GEODE_DISABLE_PRECOMPILED_HEADERS)
 	target_precompile_headers(GeodeBindings INTERFACE

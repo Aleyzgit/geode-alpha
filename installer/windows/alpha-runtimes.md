@@ -12,6 +12,31 @@ EXE names, such as `GeometryDashAlpha.exe` and `GeometryDashLegacy.exe`, so thei
 save directories under `%LOCALAPPDATA%` remain separate. Existing saves are not
 moved or converted. Mods belong in each installation's `geode/mods` directory.
 
+To copy an existing profile into a separately prepared runtime, close both game
+copies and use the import tool. For existing Geode 5 packages, select the verified
+legacy installation as the target:
+
+```powershell
+./Import-AlphaProfile.ps1 `
+    -SourceGame 'C:/Games/Geometry Dash' `
+    -SourceSave 'C:/Users/name/AppData/Local/GeometryDash' `
+    -TargetGame 'C:/Games/GD Legacy' `
+    -TargetSave 'C:/Users/name/AppData/Local/GeometryDashLegacy' -Plan
+```
+
+Remove `-Plan` to import. Mod packages, configuration, mod resources and the save
+directory are copied and verified byte for byte; source files remain intact.
+Loader binaries, loader resources and transient game-directory caches are not
+imported. Identical files are skipped. A conflicting file stops the entire plan
+before destination changes. `-ReplaceExisting` explicitly permits replacement
+and keeps previous destination files under `geode/alpha-backups/profile-*` with
+a hash manifest. A failed copy restores files already replaced by that import.
+The tool transfers data; it does not convert mods or verify their behavior.
+
+The Windows installer source includes these tools and identifies the fork as
+unofficial. Its build is blocked while native-address placeholders remain. A
+zero address count alone is not evidence that every mod or feature works.
+
 For a Steam account that owns the game, download the older Windows depot through
 the Steam console:
 

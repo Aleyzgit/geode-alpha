@@ -64,9 +64,9 @@ The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
 The GJGameLevel layout and editor build statistics now use the newer upstream
 bindings, including corrected level-browser, slider and secret-level methods.
-Sixty-nine Windows binding placeholders have been resolved; **143 remain**
+Eighty-two Windows binding placeholders have been resolved; **130 remain**
 in the pinned game declarations. The engine declarations have no remaining
-Windows placeholders. Eleven other unsafe or incorrect entries have been corrected,
+Windows placeholders. Twelve other unsafe or incorrect entries have been corrected,
 including PVR functions that previously pointed outside executable memory.
 GameLevelManager and GJLevelList now use corrected Windows layouts and native
 construction. Mod data is saved before async shutdown, preventing a later
@@ -98,13 +98,16 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. Thirty-eight native checks passed in both
+Windows validation used Clang 21.1.8. Forty-four native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
 identity caches, completion resets, coin namespaces, color interpolation, hue
 matrices, animation priority, editor offsets and scroll indicators.
-All 5,262 populated generated wrappers point into executable
+Fixtures also cover options/particle containers, abstract paged interfaces and
+native upload, user-info and admin-queue callback dispatch. The Windows HTTP
+request IDs and manager delegate layout match these native dispatch paths.
+All 5,272 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its

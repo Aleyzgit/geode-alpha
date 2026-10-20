@@ -5,18 +5,18 @@ This port is tested against GD 2.2091 EXE SHA-256
 and engine SHA-256
 `79c2f6567e5851225520803f460c6c5f6f49a2eac9afb8f3bd88d4c5697bef4e`.
 
-`cmake/AlphaWindowsAddresses.cmake` resolves 66 of the previous 209 Windows
-placeholders, adds the native GameLevelManager constructor and corrects eleven
+`cmake/AlphaWindowsAddresses.cmake` resolves 79 of the previous 209 Windows
+placeholders, adds the native GameLevelManager constructor and corrects twelve
 previously populated addresses. It verifies each expected source declaration
 before patching the build copy. Game and engine RVAs use their respective
-modules. The remaining 143 Windows placeholders are in GeometryDash.bro;
+modules. The remaining 130 Windows placeholders are in GeometryDash.bro;
 the engine declarations have no remaining Windows placeholders. This count
 does not establish completeness of class layouts or SDK implementations.
 
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
 `19c6429ab446054d98d84393378e9675f4d80607`. The generated Windows build has
-5,262 populated native wrappers, all pointing into executable sections of
+5,272 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The GameLevelManager allocation is 0x690 bytes. Constructor initialization,
@@ -32,7 +32,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-38 checks cover native constructors, level/list cache fixtures, fresh/expired
+44 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -61,6 +61,20 @@ test constructs and destroys an actual SDK object.
 EditorUI::offsetForKey is static in this game version: native 0x19f3e0 receives
 the result buffer and object ID, whereas the older version also received this.
 The generated API and tests use the current calling convention.
+
+The native PagedListPopup base is 0x308 bytes and its requestPage entry is
+pure virtual. VirtualRowSource likewise requires concrete implementations of
+its count, height and three-argument mount methods. GJOptionsLayer is 0x470
+bytes; native fixtures cover its constructor, page/group arrays and particle
+record parsing.
+
+New GameLevelManager delegate slots are interleaved with existing callbacks,
+rather than appended at the end. Level upload is at 0x578, user info at 0x5c8,
+and admin callbacks at 0x568. Four queue-mute/unmute methods precede user
+history in CommentAdminDelegate. Offline tests drive the actual game's HTTP
+dispatcher and verify receiver delivery, including both success/failure queue
+paths. The corrected Windows GJHttpType enum is overlaid without changing
+other platforms' enum values or modifying the fetched bindings repository.
 
 ## Existing Geode 5 mods
 

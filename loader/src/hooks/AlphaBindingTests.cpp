@@ -4,6 +4,7 @@
 #include <Geode/binding/CCSpriteWithHue.hpp>
 #include <Geode/binding/ColorAction.hpp>
 #include <Geode/binding/ColorChannelSprite.hpp>
+#include <Geode/binding/CommentAdminDelegate.hpp>
 #include <Geode/binding/EditorUI.hpp>
 #include <Geode/binding/FMODAudioEngine.hpp>
 #include <Geode/binding/GameLevelManager.hpp>
@@ -12,18 +13,74 @@
 #include <Geode/binding/GJEffectManager.hpp>
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/binding/GJLevelList.hpp>
+#include <Geode/binding/GJOptionsLayer.hpp>
 #include <Geode/binding/LocalLevelManager.hpp>
+#include <Geode/binding/LevelUploadDelegate.hpp>
 #include <Geode/binding/MusicDownloadManager.hpp>
 #include <Geode/binding/OBB2D.hpp>
 #include <Geode/binding/PulseEffectAction.hpp>
+#include <Geode/binding/PagedListPopup.hpp>
 #include <Geode/binding/SpriteAnimationManager.hpp>
+#include <Geode/binding/VirtualRowSource.hpp>
+#include <Geode/binding/UserInfoDelegate.hpp>
+#include <Geode/cocos/particle_nodes/CCParticleSystemQuad.h>
 #include <Geode/loader/GameEvent.hpp>
 #include <Geode/loader/Loader.hpp>
 
 using namespace geode::prelude;
 
 #ifdef GEODE_IS_WINDOWS
+static_assert(sizeof(GJOptionsLayer) == 0x470);
+static_assert(sizeof(PagedListPopup) == 0x308);
+static_assert(std::is_abstract_v<PagedListPopup>);
+static_assert(std::is_abstract_v<VirtualRowSource>);
 namespace {
+    class AlphaUserInfoFixture final : public UserInfoDelegate {
+    public:
+        int failedID = -1;
+        void getUserInfoFailed(int id) override { failedID = id; }
+    };
+
+    class AlphaAdminFixture final : public CommentAdminDelegate {
+    public:
+        unsigned callbacks = 0;
+        void adminQueueMuteFinished() override { callbacks |= 1; }
+        void adminQueueMuteFailed() override { callbacks |= 2; }
+        void adminQueueUnmuteFinished() override { callbacks |= 4; }
+        void adminQueueUnmuteFailed() override { callbacks |= 8; }
+    };
+
+    class AlphaUploadFixture final : public LevelUploadDelegate {
+    public:
+        bool failed = false;
+        GJGameLevel* level = nullptr;
+        void levelUploadFailed(GJGameLevel* value) override {
+            failed = true;
+            level = value;
+        }
+    };
+
+    class AlphaDelegateFields {
+        uintptr_t* m_fields;
+        std::array<uintptr_t, 32> m_previous;
+    public:
+        explicit AlphaDelegateFields(GameLevelManager* manager) {
+            m_fields = reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(manager) + 0x548);
+            std::copy_n(m_fields, m_previous.size(), m_previous.begin());
+            std::fill_n(m_fields, m_previous.size(), 0);
+        }
+        ~AlphaDelegateFields() {
+            std::copy(m_previous.begin(), m_previous.end(), m_fields);
+        }
+        AlphaDelegateFields(AlphaDelegateFields const&) = delete;
+        AlphaDelegateFields& operator=(AlphaDelegateFields const&) = delete;
+    };
+
+    class AlphaPagedFixture final : public PagedListPopup {
+    public:
+        int requestPage(int page) override { return page + 17; }
+    };
+
     // Restore fixture fields even when an unresolved SDK wrapper throws.
     template <class T>
     class AlphaTestField {
@@ -357,6 +414,102 @@ $on_game(Loaded) {
             !stats->m_completedLevels->objectForKey("demon_717171") &&
             stats->m_completedLevels->objectForKey("alpha-preserve") == value &&
             stats->getPathRewardKey(23) == "pr_23";
+    });
+
+    runBindingTest("Native options containers", [] {
+        std::unique_ptr<GJOptionsLayer> popup(new GJOptionsLayer());
+        auto defaults = popup->m_gap == 48.f && popup->m_page == -1 &&
+            popup->m_togglesPerPage == 10;
+        AlphaTestField pages(popup->m_pageContainers, CCArray::create());
+        AlphaTestField groups(popup->m_groupContainers, CCArray::create());
+        auto page = popup->getPageContainer(2);
+        auto group = popup->getGroupContainer(3);
+        auto valid = page && group && popup->m_pageContainers->count() == 3 &&
+            popup->m_groupContainers->count() == 4 &&
+            popup->getPageContainer(2) == page && popup->getGroupContainer(3) == group;
+        popup->GJOptionsLayer::didToggleGV("alpha-no-op-fixture");
+        return defaults && valid;
+    });
+
+    runBindingTest("Native particle numeric records", [] {
+        std::vector<std::string> tokens(80, "0");
+        tokens[0] = "37";
+        tokens[1] = "2.5";
+        tokens[2] = "1.25";
+        tokens[3] = "0.5";
+        tokens[4] = "11";
+        tokens[5] = "90";
+        tokens[11] = "3";
+        tokens[12] = "-4";
+        tokens[21] = "0.25";
+        std::string record;
+        for (auto const& token : tokens) {
+            if (!record.empty()) record += 'a';
+            record += token;
+        }
+        ParticleStruct particle;
+        GameToolbox::particleStringToStruct(record, particle);
+        auto parsed = particle.TotalParticles == 37 && particle.Duration == 2.5f &&
+            particle.Life == 1.25f && particle.LifeVar == 0.5f &&
+            particle.EmissionRate == 11 && particle.Angle == 90 &&
+            particle.GravityX == 3 && particle.GravityY == -4 &&
+            std::abs(particle.StartColorR - 0.25f) < 0.001f;
+        GameToolbox::particleStringToStruct("", particle);
+        return parsed && particle.TotalParticles == 37;
+    });
+
+    runBindingTest("Native paged base construction", [] {
+        std::unique_ptr<AlphaPagedFixture> popup(new AlphaPagedFixture());
+        auto bytes = reinterpret_cast<uint8_t const*>(popup.get());
+        auto defaults = *reinterpret_cast<int const*>(bytes + 0x2ac) == -1 &&
+            *reinterpret_cast<uint32_t const*>(bytes + 0x300) == 0xff969696;
+        PagedListPopup* base = popup.get();
+        return defaults && base->requestPage(5) == 22;
+    });
+
+    runBindingTest("Native level upload callback", [] {
+        auto manager = GameLevelManager::get();
+        AlphaDelegateFields delegates(manager);
+        AlphaTestField requests(manager->m_friendReqAndUserBlocks, CCDictionary::create());
+        AlphaTestField localLevels(LocalLevelManager::get()->m_localLevels, CCArray::create());
+        auto level = GJGameLevel::create();
+        level->m_levelID = 717171;
+        level->m_M_ID = 717171;
+        LocalLevelManager::get()->m_localLevels->addObject(level);
+        AlphaUploadFixture callback;
+        manager->m_levelUploadDelegate = &callback;
+        manager->handleIt(false, "", "717171", GJHttpType::UploadLevel);
+        auto dispatched = callback.failed && callback.level == level;
+        callback.failed = false;
+        callback.level = nullptr;
+        manager->onUploadLevelCompleted("-1", "717171");
+        return dispatched && callback.failed && callback.level == level;
+    });
+
+    runBindingTest("Native user info callback", [] {
+        auto manager = GameLevelManager::get();
+        AlphaDelegateFields delegates(manager);
+        AlphaTestField downloads(manager->m_downloadObjects, CCDictionary::create());
+        AlphaUserInfoFixture callback;
+        manager->m_userInfoDelegate = &callback;
+        manager->handleIt(false, "", "alpha_717171", GJHttpType::GetGJUserInfo);
+        auto dispatched = callback.failedID == 717171;
+        callback.failedID = -1;
+        manager->onGetGJUserInfoCompleted("-1", "alpha_717171");
+        return dispatched && callback.failedID == 717171;
+    });
+
+    runBindingTest("Native admin queue callbacks", [] {
+        auto manager = GameLevelManager::get();
+        AlphaDelegateFields delegates(manager);
+        AlphaTestField requests(manager->m_friendReqAndUserBlocks, CCDictionary::create());
+        AlphaAdminFixture callback;
+        manager->m_commentAdminDelegate = &callback;
+        manager->handleIt(true, "1", "alpha-queue", GJHttpType::AdminQueueMute);
+        manager->handleIt(false, "", "alpha-queue", GJHttpType::AdminQueueMute);
+        manager->handleIt(true, "1", "alpha-queue", GJHttpType::AdminQueueUnmute);
+        manager->handleIt(false, "", "alpha-queue", GJHttpType::AdminQueueUnmute);
+        return callback.callbacks == 15;
     });
 }
 #endif
