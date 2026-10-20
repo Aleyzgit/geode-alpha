@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 80 Windows address placeholders are in
+respective modules. The remaining 79 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
 `ae234b568310731bcf6453f846826a1e772eb6db`. The generated Windows build has
-5,438 populated native wrappers, all pointing into executable sections of
+5,440 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The GameLevelManager allocation is 0x690 bytes. Constructor initialization,
@@ -34,7 +34,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-56 checks cover native constructors, level/list cache fixtures, fresh/expired
+58 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -99,6 +99,13 @@ offsets. Tests cover native construction/destruction, restored singleton state,
 resource-cache hits and missing local files. Local-level ordering is checked
 with an isolated three-level array. The text-popup fixture now also delivers
 its value through the actual native close callback.
+
+The native audio start routine resumes the FMOD mixer and clears the stopped
+flag only on success. Tests suspend/resume the private game's mixer, verify
+FMOD_OK and check a repeated start. The current engine has a suspended-global
+flag at 0x271 and a vector<int> of suspended channels at 0x278; its
+resumeSuspendedAudio routine clears that vector and flag after processing it.
+This storage is represented directly instead of hidden in padding.
 
 ## Existing Geode 5 mods
 

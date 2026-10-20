@@ -249,7 +249,7 @@ alpha_patch_class(GeometryDash FMODAudioEngine
     "    PAD = win 0x8;\n    FMOD_RESULT m_lastResult;")
 alpha_patch_class(GeometryDash FMODAudioEngine
     "    FMODAudioState m_audioState;"
-    "    PAD = win 0x18;\n    FMODAudioState m_audioState;")
+    "    win {\n    bool m_suspendedGlobalAudio;\n    std::vector<int> m_suspendedChannels;\n    }\n    FMODAudioState m_audioState;")
 # Native channel tables at 0x668 and 0x730; stop paths use those tables and
 # the channel groups at 0x808/0x848. Queries are tested with isolated maps.
 alpha_patch_address(GeometryDash FMODAudioEngine
@@ -569,3 +569,12 @@ if (WIN32)
         "    MusicDownloadManager() = win 0x480540;\n    virtual ~MusicDownloadManager()")
 endif()
 alpha_patch_address(GeometryDash MusicDownloadManager "bool isSongDownloaded(int id)" 0x4845a0)
+
+# The only native mixerResume caller sets m_stopped (0x270) back to false,
+# resumes the suspended channel vector at 0x278 and restarts CCNode scheduling.
+alpha_patch_address(GeometryDash FMODAudioEngine "void start()" 0x5dfc0)
+if (WIN32)
+    alpha_patch_class(GeometryDash FMODAudioEngine
+        "    TodoReturn resumeSuspendedAudio();"
+        "    void resumeSuspendedAudio() = win 0x5e030;")
+endif()

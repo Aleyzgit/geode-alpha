@@ -36,6 +36,7 @@
 #include <Geode/binding/UserInfoDelegate.hpp>
 #include <Geode/binding/UploadActionPopup.hpp>
 #include <Geode/cocos/particle_nodes/CCParticleSystemQuad.h>
+#include <Geode/cocos/CCScheduler.h>
 #include <Geode/loader/GameEvent.hpp>
 #include <Geode/loader/Loader.hpp>
 
@@ -690,6 +691,30 @@ $on_game(Loaded) {
         return !manager->m_activeDownloads && !manager->m_musicObjects &&
             manager->m_customContentURL.empty() && manager->m_musicTags.empty() &&
             manager->m_resourceSfxUnorderedSet.empty() && manager->m_resourceSongUnorderedSet.empty();
+    });
+
+    runBindingTest("Native audio mixer restart", [] {
+        auto engine = FMODAudioEngine::sharedEngine();
+        // The first call also catches an unresolved wrapper before pausing.
+        engine->start();
+        if (!engine->m_system || engine->m_stopped) return false;
+        engine->stop();
+        auto scheduler = CCDirector::sharedDirector()->getScheduler();
+        auto stopped = engine->m_stopped;
+        engine->start();
+        auto resumed = !engine->m_stopped && engine->m_lastResult == FMOD_OK &&
+            !scheduler->isTargetPaused(engine);
+        engine->start();
+        return stopped && resumed && !engine->m_stopped;
+    });
+
+    runBindingTest("Native suspended audio channels", [] {
+        auto engine = std::make_unique<FMODAudioEngine>();
+        engine->m_allAudioPaused = true;
+        engine->m_suspendedGlobalAudio = true;
+        engine->m_suspendedChannels = {717171, 717172};
+        engine->resumeSuspendedAudio();
+        return !engine->m_suspendedGlobalAudio && engine->m_suspendedChannels.empty();
     });
 }
 #endif

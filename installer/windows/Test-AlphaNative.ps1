@@ -63,7 +63,9 @@ $expected = @(
     'Native text popup factory',
     'Native local level ordering',
     'Native music resource cache',
-    'Native music manager construction'
+    'Native music manager construction',
+    'Native audio mixer restart',
+    'Native suspended audio channels'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {
