@@ -45,6 +45,9 @@ if (NOT GEODE_BINDINGS_PATH)
     # Keep the fetched unversioned header intact. Windows request IDs changed
     # when native APIs were inserted into the shared HTTP dispatch enum.
     file(READ "${GEODE_BINDINGS_REPO_PATH}/bindings/include/Geode/Enums.hpp" alpha_enums)
+    # SoundStateContainer uses std::array without a direct include in its
+    # generated header. Keep it valid independently of unity source ordering.
+    set(alpha_enums "#include <array>\n${alpha_enums}")
     file(READ "${CMAKE_CURRENT_LIST_DIR}/AlphaWindowsHttpTypes.hpp" alpha_http_types)
     string(REGEX MATCH "enum class GJHttpType \\{[^}]*\\};" alpha_old_http_types "${alpha_enums}")
     if (NOT alpha_old_http_types)

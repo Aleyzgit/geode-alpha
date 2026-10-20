@@ -5,18 +5,18 @@ This port is tested against GD 2.2091 EXE SHA-256
 and engine SHA-256
 `79c2f6567e5851225520803f460c6c5f6f49a2eac9afb8f3bd88d4c5697bef4e`.
 
-`cmake/AlphaWindowsAddresses.cmake` resolves 79 of the previous 209 Windows
-placeholders, adds the native GameLevelManager constructor and corrects twelve
+`cmake/AlphaWindowsAddresses.cmake` resolves 91 of the previous 209 Windows
+placeholders, adds the native GameLevelManager constructor and corrects fifteen
 previously populated addresses. It verifies each expected source declaration
 before patching the build copy. Game and engine RVAs use their respective
-modules. The remaining 130 Windows placeholders are in GeometryDash.bro;
+modules. The remaining 118 Windows placeholders are in GeometryDash.bro;
 the engine declarations have no remaining Windows placeholders. This count
 does not establish completeness of class layouts or SDK implementations.
 
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
 `19c6429ab446054d98d84393378e9675f4d80607`. The generated Windows build has
-5,272 populated native wrappers, all pointing into executable sections of
+5,279 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The GameLevelManager allocation is 0x690 bytes. Constructor initialization,
@@ -32,7 +32,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-44 checks cover native constructors, level/list cache fixtures, fresh/expired
+53 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -75,6 +75,20 @@ history in CommentAdminDelegate. Offline tests drive the actual game's HTTP
 dispatcher and verify receiver delivery, including both success/failure queue
 paths. The corrected Windows GJHttpType enum is overlaid without changing
 other platforms' enum values or modifying the fetched bindings repository.
+
+The native keyboard manager has a pure actionsForKey vector query at slot
+0x48 before handleGlobalAction at 0x50. KeybindSource has a virtual destructor,
+four pure operations and isLevelSet. KeybindSet owns a map<int, set<int>> at
+0x8 and a changed flag at 0x18, with total size 0x20. Tests bind/unbind isolated
+chords, query both directions and dispatch through the keyboard base interface.
+
+The image-button sizing routine requires an image-button instance. Its fixture
+uses the same top-sprite setup as native callers. UploadActionPopup and
+SetTextPopup factories are exercised without network requests. The latter's
+value is at 0x2b8 and callback receiver at 0x2f0, with allocation size 0x2f8.
+Its SDK constructor preserves the native defaults and ordinary C++ destruction
+cleans up its string without calling a deleting destructor with missing flags.
+Template-browser and guideline constructors also have native lifetime fixtures.
 
 ## Existing Geode 5 mods
 
@@ -123,3 +137,8 @@ game reached its main menu and shut down without ERROR log entries. Silicate
 retained its declared xDBot/CBF Extrapolate conflicts. Empty-keybind warnings
 from Eclipse remain. Startup validation does not prove every mod feature works
 or that Geode 5 DLLs can run inside the GD 2.2091 process.
+
+The profile-import tool was additionally exercised with the 38 copied user mod
+packages, configuration, mod resources and private legacy saves: 136 files
+were transferred and all 38 package hashes matched. This verifies data transfer,
+not full behavioral compatibility in the new game process.

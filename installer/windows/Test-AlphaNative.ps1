@@ -51,7 +51,16 @@ $expected = @(
     'Native paged base construction',
     'Native level upload callback',
     'Native user info callback',
-    'Native admin queue callbacks'
+    'Native admin queue callbacks',
+    'Native button background sizing',
+    'Native upload popup factory',
+    'Native local key bindings',
+    'Native global key lookup dispatch',
+    'Native editor window base',
+    'Native scroll base ownership',
+    'Native template browser construction',
+    'Native guidelines construction',
+    'Native text popup factory'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {

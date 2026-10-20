@@ -1,28 +1,39 @@
 #include <Geode/binding/AchievementManager.hpp>
 #include <Geode/binding/BoomScrollLayer.hpp>
+#include <Geode/binding/ButtonSprite.hpp>
+#include <Geode/binding/BrowseSmartTemplateLayer.hpp>
 #include <Geode/binding/CCAnimateFrameCache.hpp>
 #include <Geode/binding/CCSpriteWithHue.hpp>
 #include <Geode/binding/ColorAction.hpp>
 #include <Geode/binding/ColorChannelSprite.hpp>
 #include <Geode/binding/CommentAdminDelegate.hpp>
+#include <Geode/binding/CreateGuidelinesLayer.hpp>
 #include <Geode/binding/EditorUI.hpp>
+#include <Geode/binding/EditorWindowPopup.hpp>
 #include <Geode/binding/FMODAudioEngine.hpp>
 #include <Geode/binding/GameLevelManager.hpp>
 #include <Geode/binding/GameStatsManager.hpp>
 #include <Geode/binding/GameToolbox.hpp>
 #include <Geode/binding/GJEffectManager.hpp>
 #include <Geode/binding/GJGameLevel.hpp>
+#include <Geode/binding/GJKeybindManager.hpp>
+#include <Geode/binding/GlobalKeybindSource.hpp>
 #include <Geode/binding/GJLevelList.hpp>
 #include <Geode/binding/GJOptionsLayer.hpp>
 #include <Geode/binding/LocalLevelManager.hpp>
+#include <Geode/binding/KeybindSet.hpp>
 #include <Geode/binding/LevelUploadDelegate.hpp>
 #include <Geode/binding/MusicDownloadManager.hpp>
 #include <Geode/binding/OBB2D.hpp>
 #include <Geode/binding/PulseEffectAction.hpp>
 #include <Geode/binding/PagedListPopup.hpp>
 #include <Geode/binding/SpriteAnimationManager.hpp>
+#include <Geode/binding/ScrollViewPopup.hpp>
+#include <Geode/binding/SetTextPopup.hpp>
+#include <Geode/binding/CCTextInputNode.hpp>
 #include <Geode/binding/VirtualRowSource.hpp>
 #include <Geode/binding/UserInfoDelegate.hpp>
+#include <Geode/binding/UploadActionPopup.hpp>
 #include <Geode/cocos/particle_nodes/CCParticleSystemQuad.h>
 #include <Geode/loader/GameEvent.hpp>
 #include <Geode/loader/Loader.hpp>
@@ -34,7 +45,29 @@ static_assert(sizeof(GJOptionsLayer) == 0x470);
 static_assert(sizeof(PagedListPopup) == 0x308);
 static_assert(std::is_abstract_v<PagedListPopup>);
 static_assert(std::is_abstract_v<VirtualRowSource>);
+static_assert(sizeof(KeybindSet) == 0x20);
+static_assert(sizeof(EditorWindowPopup) == 0x480);
+static_assert(sizeof(ScrollViewPopup) == 0x2a8);
+static_assert(sizeof(BrowseSmartTemplateLayer) == 0x2c8);
+static_assert(sizeof(CreateGuidelinesLayer) == 0x300);
+static_assert(sizeof(SetTextPopup) == 0x2f8);
+static_assert(std::is_abstract_v<KeybindSource>);
+static_assert(std::is_abstract_v<CCKeyboardActionManager>);
+static_assert(std::is_abstract_v<EditorWindowPopup>);
+static_assert(std::is_abstract_v<ScrollViewPopup>);
 namespace {
+    class AlphaEditorWindowFixture final : public EditorWindowPopup {
+    public:
+        void onBuildWindowContent() override {}
+    };
+
+    class AlphaScrollFixture final : public ScrollViewPopup {
+    public:
+        float buildContent(CCNode*, float width, float height) override {
+            return width + height;
+        }
+    };
+
     class AlphaUserInfoFixture final : public UserInfoDelegate {
     public:
         int failedID = -1;
@@ -510,6 +543,103 @@ $on_game(Loaded) {
         manager->handleIt(true, "1", "alpha-queue", GJHttpType::AdminQueueUnmute);
         manager->handleIt(false, "", "alpha-queue", GJHttpType::AdminQueueUnmute);
         return callback.callbacks == 15;
+    });
+
+    runBindingTest("Native button background sizing", [] {
+        auto icon = CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png");
+        if (!icon) return false;
+        auto button = ButtonSprite::create(icon);
+        if (!button || button->m_subSprite != icon || !button->m_BGSprite) return false;
+        auto before = button->getContentSize();
+        button->updateSpriteBGSize();
+        auto after = button->getContentSize();
+        return before.width > 0 && before.height > 0 &&
+            std::abs(after.width - before.width) < 0.001f &&
+            std::abs(after.height - before.height) < 0.001f;
+    });
+
+    runBindingTest("Native upload popup factory", [] {
+        auto popup = UploadActionPopup::create(nullptr, "Alpha fixture");
+        return popup && popup->m_textArea && popup->m_loadingCircle &&
+            popup->m_closeButton && !popup->m_succeeded;
+    });
+
+    runBindingTest("Native local key bindings", [] {
+        auto source = std::make_unique<KeybindSet>();
+        KeybindSource* base = source.get();
+        if (source->m_changed || !base->isLevelSet()) return false;
+        base->bindChord(7, 42);
+        base->bindChord(9, 42);
+        base->bindChord(7, 43);
+        auto queried = base->chordsForAction(42) == std::vector<int>{7, 9} &&
+            base->actionsForChord(7) == std::vector<int>{42, 43};
+        base->unbindChord(7, 42);
+        return queried && source->m_changed &&
+            base->chordsForAction(42) == std::vector<int>{9} &&
+            base->actionsForChord(7) == std::vector<int>{43} &&
+            base->chordsForAction(717171).empty();
+    });
+
+    runBindingTest("Native global key lookup dispatch", [] {
+        GlobalKeybindSource source(geode::ZeroConstructor);
+        KeybindSource* base = &source;
+        auto manager = GJKeybindManager::sharedState();
+        CCKeyboardActionManager* keyboard = manager;
+        return !base->isLevelSet() &&
+            base->chordsForAction(717171) == manager->chordsForAction(717171) &&
+            base->actionsForChord(717171) == manager->actionsForChord(717171) &&
+            keyboard->actionsForKey(KEY_A, false, false, false) ==
+                manager->GJKeybindManager::actionsForKey(KEY_A, false, false, false);
+    });
+
+    runBindingTest("Native editor window base", [] {
+        auto popup = std::make_unique<AlphaEditorWindowFixture>();
+        auto bytes = reinterpret_cast<uint8_t const*>(popup.get());
+        EditorWindowPopup* base = popup.get();
+        base->onBuildWindowContent();
+        return *reinterpret_cast<float const*>(bytes + 0x418) == 1.f &&
+            *reinterpret_cast<int const*>(bytes + 0x424) == -1 &&
+            *reinterpret_cast<float const*>(bytes + 0x458) == 100.f;
+    });
+
+    runBindingTest("Native scroll base ownership", [] {
+        auto owned = CCNode::create();
+        auto references = owned->retainCount();
+        {
+            auto popup = std::make_unique<AlphaScrollFixture>();
+            auto field = reinterpret_cast<CCObject**>(reinterpret_cast<uintptr_t>(popup.get()) + 0x298);
+            if (*field) return false;
+            owned->retain();
+            *field = owned;
+            ScrollViewPopup* base = popup.get();
+            if (base->buildContent(nullptr, 17.f, 23.f) != 40.f) return false;
+        }
+        return owned->retainCount() == references;
+    });
+
+    runBindingTest("Native template browser construction", [] {
+        auto popup = std::make_unique<BrowseSmartTemplateLayer>();
+        return !popup->m_template && !popup->m_pages && popup->m_page == 0 &&
+            !popup->m_nextPageBtn && !popup->m_prevPageBtn && !popup->m_dotsArray;
+    });
+
+    runBindingTest("Native guidelines construction", [] {
+        auto popup = std::make_unique<CreateGuidelinesLayer>();
+        return !popup->m_delegate && popup->m_elapsed == 0.f &&
+            !popup->m_recording && !popup->m_unk2b5 && popup->m_guidelineString.empty();
+    });
+
+    runBindingTest("Native text popup factory", [] {
+        {
+            auto sdkPopup = std::make_unique<SetTextPopup>();
+            if (sdkPopup->m_input || sdkPopup->m_delegate ||
+                sdkPopup->m_disableDelegate || sdkPopup->m_cancelled) return false;
+            sdkPopup->m_value = std::string(80, 'a');
+        }
+        auto popup = SetTextPopup::create("fixture", "Enter text", 32,
+            "Alpha fixture", "OK", false, 0.f, false, 0, 0);
+        return popup && popup->m_input && popup->m_input->getString() == "fixture" &&
+            popup->m_value == "fixture" && !popup->m_delegate;
     });
 }
 #endif

@@ -427,3 +427,113 @@ alpha_patch_class(GeometryDash GameLevelManager
 alpha_patch_class(GeometryDash GameLevelManager
     "void onGetGJUserInfoCompleted(std::string response, std::string tag) = imac"
     "void onGetGJUserInfoCompleted(std::string response, std::string tag) = win 0x23a830, imac")
+
+alpha_patch_address(GeometryDash ButtonSprite "void updateSpriteBGSize()" 0x430e0)
+alpha_patch_address(GeometryDash UploadActionPopup
+    "static UploadActionPopup* create(UploadPopupDelegate* delegate, std::string str)" 0x3a0d60)
+
+if (WIN32)
+    # Native KeybindSource has a virtual destructor, four pure entries, then
+    # isLevelSet. Chord/action queries return vectors of 32-bit integers.
+    alpha_patch_class(GeometryDash KeybindSource
+        "    virtual TodoReturn chordsForAction(int) = win 0x9999999;"
+        "    inline virtual ~KeybindSource() {}\n    inline virtual std::vector<int> chordsForAction(int) = 0;")
+    alpha_patch_class(GeometryDash KeybindSource
+        "    virtual TodoReturn actionsForChord(int) = win 0x9999999;"
+        "    inline virtual std::vector<int> actionsForChord(int) = 0;")
+    foreach(method bindChord unbindChord)
+        alpha_patch_class(GeometryDash KeybindSource
+            "    virtual TodoReturn ${method}(int, int) = win 0x9999999;"
+            "    inline virtual void ${method}(int, int) = 0;")
+    endforeach()
+    alpha_patch_class(GeometryDash KeybindSource
+        "    bool isLevelSet() = win 0x5a3a0;"
+        "    virtual bool isLevelSet() = win 0x5a3a0;")
+    foreach(class GlobalKeybindSource KeybindSet)
+        foreach(method chordsForAction actionsForChord)
+            alpha_patch_class(GeometryDash "${class}"
+                "virtual TodoReturn ${method}(int)" "virtual std::vector<int> ${method}(int)")
+        endforeach()
+        foreach(method bindChord unbindChord)
+            alpha_patch_class(GeometryDash "${class}"
+                "virtual TodoReturn ${method}(int, int)" "virtual void ${method}(int, int)")
+        endforeach()
+    endforeach()
+    # Both populated destructor entries are deleting destructors taking flags.
+    # Ordinary C++ destruction releases the owned map exactly once.
+    alpha_patch_class(GeometryDash GlobalKeybindSource
+        "    virtual ~GlobalKeybindSource() = win 0x3d51d0;"
+        "    inline virtual ~GlobalKeybindSource() {}")
+    alpha_patch_class(GeometryDash KeybindSet
+        "    virtual ~KeybindSet() = win 0x44a370;"
+        "    KeybindSet() = win inline;\n    inline virtual ~KeybindSet() {}")
+    alpha_patch_class(GeometryDash KeybindSet
+        "    bool isLevelSet() = win 0x3ff70;"
+        "    virtual bool isLevelSet() = win 0x3ff70;\n    std::map<int, std::set<int>> m_bindings;\n    bool m_changed;\n    PAD = win 0x7;")
+    file(CONFIGURE OUTPUT "${alpha_bindings_output}/inline/KeybindSet.cpp"
+        CONTENT "#include <Geode/binding/KeybindSet.hpp>\n\nKeybindSet::KeybindSet() : KeybindSource(geode::ZeroConstructor), m_changed(false) {}\n" @ONLY)
+    alpha_patch_class(GeometryDash GJKeybindManager
+        "virtual TodoReturn actionsForKey(cocos2d::enumKeyCodes, bool, bool, bool)"
+        "virtual std::vector<int> actionsForKey(cocos2d::enumKeyCodes, bool, bool, bool)")
+    alpha_patch_class(GeometryDash GJKeybindManager
+        "    static GJKeybindManager* sharedState();"
+        "    static GJKeybindManager* sharedState() = win 0x388320;")
+    alpha_patch_class(GeometryDash GJKeybindManager
+        "    TodoReturn chordsForAction(int);"
+        "    std::vector<int> chordsForAction(int) = win 0x388790;")
+    alpha_patch_class(GeometryDash GJKeybindManager
+        "    TodoReturn actionsForChord(int);"
+        "    std::vector<int> actionsForChord(int) = win 0x388920;")
+endif()
+
+# Native editor window base allocates 0x480, initializes 0x3e8..0x478 and
+# leaves onBuildWindowContent pure. Concrete editor popups provide the body.
+alpha_patch_address(GeometryDash EditorWindowPopup "EditorWindowPopup()" 0x123530)
+alpha_patch_class(GeometryDash EditorWindowPopup
+    "    virtual void onBuildWindowContent() = win 0x9999999;"
+    "    inline virtual void onBuildWindowContent() = 0;")
+alpha_patch_class(GeometryDash EditorWindowPopup
+    "    TodoReturn clampWindowCenter(cocos2d::CCPoint);"
+    "    TodoReturn clampWindowCenter(cocos2d::CCPoint);\n    PAD = win 0x98;")
+
+# ScrollViewPopup's native base has one retained object at 0x298, a further
+# eight bytes of state, and a pure buildContent entry at vtable offset 0x438.
+alpha_patch_class(GeometryDash ScrollViewPopup
+    "    virtual ~ScrollViewPopup() = win 0x6218d0;"
+    "    ScrollViewPopup() = win 0x47f7b0;\n    virtual ~ScrollViewPopup() = win inline;")
+alpha_patch_class(GeometryDash ScrollViewPopup
+    "    virtual float buildContent(cocos2d::CCNode*, float, float) = win 0x9999999;"
+    "    inline virtual float buildContent(cocos2d::CCNode*, float, float) = 0;")
+alpha_patch_class(GeometryDash ScrollViewPopup
+    "    void onClose(cocos2d::CCObject* sender);"
+    "    void onClose(cocos2d::CCObject* sender);\n    PAD = win 0x10;")
+file(CONFIGURE OUTPUT "${alpha_bindings_output}/inline/ScrollViewPopup.cpp"
+    CONTENT "#include <Geode/binding/ScrollViewPopup.hpp>\n\n#ifdef GEODE_IS_WINDOWS\nScrollViewPopup::~ScrollViewPopup() {\n    auto owned = *reinterpret_cast<cocos2d::CCObject**>(reinterpret_cast<uintptr_t>(this) + 0x298);\n    CC_SAFE_RELEASE(owned);\n}\n#endif\n" @ONLY)
+
+# Native RTTI constructors and their deleting-destructor sizes agree with
+# the SDK browser (0x2c8) and guidelines (0x300) layouts.
+alpha_patch_address(GeometryDash BrowseSmartTemplateLayer "BrowseSmartTemplateLayer()" 0x5ec020)
+alpha_patch_address(GeometryDash CreateGuidelinesLayer "CreateGuidelinesLayer()" 0x132b20)
+
+# SetTextPopup's native factory inlines construction: input at 0x2a0, value
+# string at 0x2b8, delegate at 0x2f0, allocation size 0x2f8. Its 0x399820
+# destructor also takes deleting flags; normal C++ cleanup needs no such call.
+alpha_patch_class(GeometryDash SetTextPopup
+    "    SetTextPopup() = win 0x9999999, inline;"
+    "    SetTextPopup() = inline;")
+alpha_patch_class(GeometryDash SetTextPopup
+    "    ~SetTextPopup() = win 0x399820;"
+    "    ~SetTextPopup() = win inline;")
+alpha_patch_class(GeometryDash SetTextPopup
+    "    std::string m_value;" "    PAD = win 0x8;\n    std::string m_value;")
+alpha_patch_class(GeometryDash SetTextPopup
+    "    SetTextPopupDelegate* m_delegate;"
+    "    PAD = win 0x18;\n    SetTextPopupDelegate* m_delegate;")
+alpha_patch_class(GeometryDash SetTextPopup
+    "static SetTextPopup* create(std::string, std::string, int, std::string, std::string, bool, float, bool, int, int) = imac"
+    "static SetTextPopup* create(std::string, std::string, int, std::string, std::string, bool, float, bool, int, int) = win 0x3a6f70, imac")
+alpha_patch_class(GeometryDash SetTextPopup
+    "bool init(std::string, std::string, int, std::string, std::string, bool, float, bool, int, int);"
+    "bool init(std::string, std::string, int, std::string, std::string, bool, float, bool, int, int) = win 0x3a71f0;")
+file(APPEND "${alpha_bindings_output}/inline/SetTextPopup.cpp"
+    "\n#ifdef GEODE_IS_WINDOWS\nSetTextPopup::SetTextPopup() {\n    m_input = nullptr;\n    m_disableDelegate = false;\n    m_cancelled = false;\n    m_delegate = nullptr;\n    std::memset(reinterpret_cast<uint8_t*>(this) + 0x2ac, 0, 8);\n    std::memset(reinterpret_cast<uint8_t*>(this) + 0x2d8, 0, 0x18);\n}\nSetTextPopup::~SetTextPopup() {\n    removeAllChildrenWithCleanup(true);\n}\n#endif\n")
