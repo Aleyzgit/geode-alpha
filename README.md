@@ -64,8 +64,13 @@ The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
 The GJGameLevel layout and editor build statistics now use the newer upstream
 bindings, including corrected level-browser, slider and secret-level methods.
-Three Windows binding placeholders have been resolved; **209 remain** across
-the pinned game and engine declarations (191 game and 18 engine addresses).
+Thirty-three Windows binding placeholders have been resolved; **179 remain**
+in the pinned game declarations. The engine declarations have no remaining
+Windows placeholders. Nine other incorrect addresses have been corrected,
+including PVR functions that previously pointed outside executable memory.
+GameLevelManager and GJLevelList now use corrected Windows layouts and native
+construction. Mod data is saved before async shutdown, preventing a later
+native save from invoking mods after their runtime has stopped.
 Unsupported hooks report an error instead of claiming successful activation.
 Native class layouts and SDK interfaces also change between versions.
 
@@ -90,10 +95,12 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. Runtime checks passed for settings,
-version gates, platform rejection, native integer variables, local-level
-access, native level progress and rejection of unresolved hooks in both
-compatibility modes. The native save path persisted a test
+Windows validation used Clang 21.1.8. Seventeen native checks passed in both
+compatibility modes, including manager cache fixtures, local list lookup,
+easing, dictionary merging, robot creation, lightning drawing and invalid PVR
+header rejection. All 5,199 populated generated wrappers point into executable
+sections of their respective tested modules; that audit does not prove their
+semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its
 unchanged C++ source against this SDK and loaded its window hook successfully.
 Its published Geode 5 DLL cannot load unchanged because it imports three
@@ -101,10 +108,17 @@ EventCenterThreadLocal exports that the v6 SDK no longer provides. This is
 one tested mod, not a general binary-compatibility guarantee.
 
 For existing Geode 5 mods, the optional [Windows runtime launcher](installer/windows/alpha-runtimes.md)
-can select a separate GD 2.2081 / official Geode 5.11.2 installation. It checks
+can select a separate GD 2.2081 / Geode 5.11.2 installation. It checks
 the configured binaries and mod manifests before launch. This provides a
 matching older game process; it does not complete the 2.2091 port or convert
 old mods into Geode 6 mods.
+
+The optional [mod repair and native validation tools](installer/windows/alpha-native-validation.md)
+fix Prism's missing setting default and initialize absent Eclipse/BetterInfo
+theme/cache files. A separately built Geode 5 backport fixes the same save-order
+failure for legacy mods. The 38 copied mod packages reached the main menu and
+clean shutdown in that runtime without ERROR log entries; Silicate's declared
+conflicts remain. This does not establish compatibility with every mod feature.
 
 **This fork contains code and documentation created with AI assistance.
 Geode Alpha is unofficial and is not an official Geode release or endorsed

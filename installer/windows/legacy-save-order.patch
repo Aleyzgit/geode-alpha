@@ -1,0 +1,76 @@
+--- a/loader/src/hooks/GameExit.cpp
++++ b/loader/src/hooks/GameExit.cpp
+@@ -2,6 +2,7 @@
+ #include <Geode/modify/CCDirector.hpp>
+ #include <Geode/modify/PlatformToolbox.hpp>
+ #include <cocos2d.h>
++#include "Save.hpp"
+ 
+ #ifdef GEODE_IS_MACOS
+ #include <Geode/utils/ObjcHook.hpp>
+@@ -54,6 +55,9 @@
+     GEODE_FORWARD_COMPAT_DISABLE_HOOKS("gameexit hook crashes on 2.209")
+ 
+     void purgeDirector() {
++#ifdef GEODE_IS_WINDOWS
++        saveModData();
++#endif
+         triggerEvent();
+         CCDirector::purgeDirector();
+     }
+--- a/loader/src/hooks/save.cpp
++++ b/loader/src/hooks/save.cpp
+@@ -1,4 +1,7 @@
+ #include <Geode/loader/Loader.hpp>
++#include <Geode/loader/GameEvent.hpp>
++#include <Geode/loader/ModEvent.hpp>
++#include "Save.hpp"
+ 
+ using namespace geode::prelude;
+ 
+@@ -6,7 +9,13 @@
+ #include <Geode/modify/CCApplication.hpp>
+ 
+ namespace {
++    bool shuttingDown = false;
++}
++
++namespace geode {
+     void saveModData() {
++        // Native teardown can save again after Exiting has stopped async tasks.
++        if (shuttingDown) return;
+         log::info("Saving mod data...");
+         log::NestScope nest;
+ 
+@@ -18,6 +27,12 @@
+         auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+         log::info("Took {}s", static_cast<float>(time) / 1000.f);
+     }
++}
++
++$on_mod(Loaded) {
++    GameEvent(GameEventType::Exiting).listen([] {
++        shuttingDown = true;
++    }, Priority::First + 1).leak();
+ }
+ 
+ struct SaveLoader : Modify<SaveLoader, AppDelegate> {
+@@ -47,8 +62,8 @@
+ 
+ // redirects the save path to what geode knows, in case launcher's fopen hook fails
+ struct FileOperationOverride : Modify<FileOperationOverride, FileOperation> {
+-    static gd::string getFilePath() {
+-        return utils::string::pathToString(dirs::getSaveDir()) + "/";
++    static std::string getFilePath() {
++        return dirs::getSaveDir().string() + "/";
+     }
+ };
+ 
+--- /dev/null
++++ b/loader/src/hooks/Save.hpp
+@@ -0,0 +1,5 @@
++#pragma once
++
++namespace geode {
++    void saveModData();
++}

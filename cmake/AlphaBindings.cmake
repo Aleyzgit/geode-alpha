@@ -41,6 +41,7 @@ if (NOT GEODE_BINDINGS_PATH)
 
     file(CONFIGURE OUTPUT "${alpha_bindings_output}/GeometryDash.bro"
         CONTENT "${alpha_bindings}" @ONLY)
+    include("${CMAKE_CURRENT_LIST_DIR}/AlphaWindowsAddresses.cmake")
     set(GEODE_BINDINGS_PATH "${alpha_bindings_output}")
 endif()
 

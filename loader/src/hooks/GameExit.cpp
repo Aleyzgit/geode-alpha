@@ -2,6 +2,7 @@
 #include <Geode/loader/GameEvent.hpp>
 #include <Geode/modify/CCDirector.hpp>
 #include <Geode/modify/PlatformToolbox.hpp>
+#include "Save.hpp"
 
 #ifdef GEODE_IS_MACOS
 #include <Geode/utils/ObjcHook.hpp>
@@ -54,6 +55,11 @@ struct GameExitHook : Modify<GameExitHook, CCDirector> {
     GEODE_FORWARD_COMPAT_DISABLE_HOOKS("gameexit hook crashes on 2.209")
 
     void purgeDirector() {
+#ifdef GEODE_IS_WINDOWS
+        // DataSaved listeners may start async writes. Flush them before the
+        // Exiting listeners stop the runtime and native teardown saves again.
+        saveModData();
+#endif
         triggerEvent();
         CCDirector::purgeDirector();
     }

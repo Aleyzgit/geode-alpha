@@ -2,6 +2,8 @@ param(
     [Parameter(Mandatory = $true)][string]$CurrentExe,
     [Parameter(Mandatory = $true)][string]$LegacyExe,
     [Parameter(Mandatory = $true)][string]$Output,
+    [ValidatePattern('^[0-9a-fA-F]{64}$')]
+    [string]$LegacyLoaderSha256 = '0c34f50454c102637038cae48c8c7dd685da3582fe474358024b1eb6833684d3',
     [switch]$Force
 )
 
@@ -33,9 +35,9 @@ function New-RuntimeProfile($Id, $Executable, $GameVersion, $GameHash, $EngineHa
     $version = (Get-Content -LiteralPath `
         "$directory/geode/resources/geode.loader/version" -Raw).Trim()
     if ($Id -eq 'Legacy') {
-        $expectedLoader = '0c34f50454c102637038cae48c8c7dd685da3582fe474358024b1eb6833684d3'
+        $expectedLoader = $LegacyLoaderSha256
         if ($version -ne '5.11.2' -or $loaderDigest -ne $expectedLoader) {
-            throw 'Legacy requires the official Geode 5.11.2 loader and resources.'
+            throw 'Legacy requires Geode 5.11.2 resources and the explicitly pinned loader hash.'
         }
     }
     elseif ($version -notmatch '^6\.\d+\.\d+') {

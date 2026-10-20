@@ -67,7 +67,7 @@ Geode without loading external mods, including when a package is corrupt.
 
 `-Runtime Current -Experimental` retains the existing Alpha version override.
 It permits attempts to load mismatched mods and does not establish compatibility.
-The official legacy loader does not provide that override. Neither the launcher
+The legacy loader does not provide that override. Neither the launcher
 nor the separate legacy installation completes the unfinished 2.2091 port.
 
 ## Validation
@@ -80,6 +80,9 @@ The tested Steam manifest runs as GD 2.2081 with official Geode 5.11.2. All
 38 installed test packages had their required Geode exports and reached the
 loader's mod-loading stage. Process inspection confirmed 37 mod DLLs loaded.
 Silicate was blocked by its declared incompatibilities with xDBot and CBF
-Extrapolate. That startup also reported third-party setting, theme and cache
-errors; it does not prove every mod feature works. Preserve the desired enabled
-mod selection when setting up a new profile.
+Extrapolate. That initial startup also reported third-party setting, theme and
+cache errors. The [repair tools and save-order backport](alpha-native-validation.md)
+were subsequently tested with all 38 copied packages: main-menu startup and
+shutdown completed without ERROR entries. Existing Eclipse empty-keybind
+warnings remain. This does not prove every mod feature works. Preserve the
+desired enabled mod selection when setting up a new profile.

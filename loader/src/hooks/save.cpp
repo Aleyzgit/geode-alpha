@@ -1,4 +1,7 @@
 #include <Geode/loader/Loader.hpp>
+#include <Geode/loader/GameEvent.hpp>
+#include <Geode/loader/ModEvent.hpp>
+#include "Save.hpp"
 
 using namespace geode::prelude;
 
@@ -6,7 +9,13 @@ using namespace geode::prelude;
 #include <Geode/modify/CCApplication.hpp>
 
 namespace {
+    bool shuttingDown = false;
+}
+
+namespace geode {
     void saveModData() {
+        // Native teardown can save again after Exiting has stopped async tasks.
+        if (shuttingDown) return;
         log::info("Saving mod data...");
         log::NestScope nest;
 
@@ -18,6 +27,12 @@ namespace {
         auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
         log::info("Took {}s", static_cast<float>(time) / 1000.f);
     }
+}
+
+$on_mod(Loaded) {
+    GameEvent(GameEventType::Exiting).listen([] {
+        shuttingDown = true;
+    }, Priority::First + 1).leak();
 }
 
 struct SaveLoader : Modify<SaveLoader, AppDelegate> {

@@ -17,7 +17,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Windows PowerShell 5.1
         shell: powershell
-        run: ./installer/windows/Test-AlphaLauncher.ps1
+        run: |
+          ./installer/windows/Test-AlphaLauncher.ps1
+          ./installer/windows/Test-AlphaModRepairs.ps1
       - name: PowerShell 7
         shell: pwsh
-        run: ./installer/windows/Test-AlphaLauncher.ps1
+        run: |
+          ./installer/windows/Test-AlphaLauncher.ps1
+          ./installer/windows/Test-AlphaModRepairs.ps1
