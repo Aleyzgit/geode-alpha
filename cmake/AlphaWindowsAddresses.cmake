@@ -542,3 +542,30 @@ alpha_patch_class(GeometryDash SetTextPopup
     "bool init(std::string, std::string, int, std::string, std::string, bool, float, bool, int, int) = win 0x3a71f0;")
 file(APPEND "${alpha_bindings_output}/inline/SetTextPopup.cpp"
     "\n#ifdef GEODE_IS_WINDOWS\nSetTextPopup::SetTextPopup() {\n    m_input = nullptr;\n    m_disableDelegate = false;\n    m_cancelled = false;\n    m_delegate = nullptr;\n    std::memset(reinterpret_cast<uint8_t*>(this) + 0x2ac, 0, 8);\n    std::memset(reinterpret_cast<uint8_t*>(this) + 0x2d8, 0, 0x18);\n}\nSetTextPopup::~SetTextPopup() {\n    removeAllChildrenWithCleanup(true);\n}\n#endif\n")
+
+alpha_patch_address(GeometryDash LocalLevelManager "int updateLevelOrder()" 0x46b690)
+alpha_patch_class(GeometryDash SetTextPopup
+    "void onClose(cocos2d::CCObject* sender);"
+    "void onClose(cocos2d::CCObject* sender) = win 0x3a85a0;")
+
+# Native MusicDownloadManager allocates 0x3d0. New storage precedes the SFX
+# requested flag, the music-tag map and the music-library counters. Native
+# construction puts tag map at 0x1d8 and resource sets at 0x208 / 0x248.
+alpha_patch_class(GeometryDash MusicDownloadManager
+    "    bool m_requestedSfxLibraryDownloaded;"
+    "    PAD = win 0x10;\n    bool m_requestedSfxLibraryDownloaded;")
+alpha_patch_class(GeometryDash MusicDownloadManager
+    "    std::map<int, std::string> m_musicTags;"
+    "    PAD = win 0x8;\n    std::map<int, std::string> m_musicTags;")
+alpha_patch_class(GeometryDash MusicDownloadManager
+    "    int m_musicLibraryVersion;"
+    "    PAD = win 0x10;\n    int m_musicLibraryVersion;")
+alpha_patch_class(GeometryDash MusicDownloadManager
+    "    std::unordered_set<int> m_resourceSongUnorderedSet;"
+    "    std::unordered_set<int> m_resourceSongUnorderedSet;\n    PAD = win 0x148;")
+if (WIN32)
+    alpha_patch_class(GeometryDash MusicDownloadManager
+        "    virtual ~MusicDownloadManager()"
+        "    MusicDownloadManager() = win 0x480540;\n    virtual ~MusicDownloadManager()")
+endif()
+alpha_patch_address(GeometryDash MusicDownloadManager "bool isSongDownloaded(int id)" 0x4845a0)

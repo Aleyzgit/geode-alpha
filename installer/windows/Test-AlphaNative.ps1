@@ -60,7 +60,10 @@ $expected = @(
     'Native scroll base ownership',
     'Native template browser construction',
     'Native guidelines construction',
-    'Native text popup factory'
+    'Native text popup factory',
+    'Native local level ordering',
+    'Native music resource cache',
+    'Native music manager construction'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {

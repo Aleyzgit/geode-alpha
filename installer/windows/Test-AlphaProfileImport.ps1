@@ -83,6 +83,26 @@ try {
         $identical = $paths.Clone(); $identical.TargetGame = $identical.SourceGame
         Reject '*must be separate*' { & $importer @identical }
     }
+    Check 'A failed destination copy rolls back replaced and new files' {
+        Put "$root/source-game/geode/mods/old-mod.geode" 'replacement mod'
+        Put "$root/source-game/geode/mods/new-after-plan.geode" 'new mod'
+        Put "$root/source-save/CCGameManager.dat" 'replacement progress'
+        function Copy-Item {
+            [CmdletBinding()]
+            param([string]$LiteralPath, [string]$Destination, [switch]$Force)
+            if ($LiteralPath -like '*incoming*' -and
+                $Destination -like '*target-save*CCGameManager.dat') {
+                throw 'Injected copy failure.'
+            }
+            Microsoft.PowerShell.Management\Copy-Item @PSBoundParameters
+        }
+        try { Reject '*Injected copy failure*' { & $importer @paths -ReplaceExisting } }
+        finally { Remove-Item Function:Copy-Item }
+        Assert ((Read "$root/target-game/geode/mods/old-mod.geode") -eq 'original mod bytes')
+        Assert ((Read "$root/target-save/CCGameManager.dat") -eq 'game progress')
+        Assert (-not (Test-Path -LiteralPath "$root/target-game/geode/mods/new-after-plan.geode"))
+        Assert ((Read "$root/source-game/geode/mods/old-mod.geode") -eq 'replacement mod')
+    }
     Check 'Destination junctions reject before writing outside the profile' {
         $linkGame = "$root/link-game"
         New-Item -ItemType Directory -Path "$root/outside", "$linkGame/geode" -Force | Out-Null

@@ -64,7 +64,7 @@ The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
 The GJGameLevel layout and editor build statistics now use the newer upstream
 bindings, including corrected level-browser, slider and secret-level methods.
-**82 Windows native-address placeholders remain**
+**80 Windows native-address placeholders remain**
 in the pinned game declarations. The engine declarations have no remaining
 Windows placeholders. Additional unsafe or incorrect entries have been corrected,
 including PVR functions that previously pointed outside executable memory.
@@ -98,7 +98,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. Fifty-three native checks passed in both
+Windows validation used Clang 21.1.8. Fifty-six native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -110,7 +110,7 @@ request IDs and manager delegate layout match these native dispatch paths.
 Key binding queries use typed integer vectors and the native virtual-method
 order. Further fixtures exercise image-button sizing, popup factories, text
 input state and construction/destruction of editor and scroll bases.
-All 5,434 populated generated wrappers point into executable
+All 5,438 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its

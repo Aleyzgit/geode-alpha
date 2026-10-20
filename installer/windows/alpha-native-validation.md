@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 82 Windows address placeholders are in
+respective modules. The remaining 80 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
 `ae234b568310731bcf6453f846826a1e772eb6db`. The generated Windows build has
-5,434 populated native wrappers, all pointing into executable sections of
+5,438 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The GameLevelManager allocation is 0x690 bytes. Constructor initialization,
@@ -34,7 +34,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-53 checks cover native constructors, level/list cache fixtures, fresh/expired
+56 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -92,6 +92,14 @@ Its SDK constructor preserves the native defaults and ordinary C++ destruction
 cleans up its string without calling a deleting destructor with missing flags.
 Template-browser and guideline constructors also have native lifetime fixtures.
 
+MusicDownloadManager's native allocation is 0x3d0. Its tag map is at 0x1d8,
+and its resource SFX/song sets are at 0x208/0x248. Interleaved new native
+storage previously left the SDK's library fields and resource sets at incorrect
+offsets. Tests cover native construction/destruction, restored singleton state,
+resource-cache hits and missing local files. Local-level ordering is checked
+with an isolated three-level array. The text-popup fixture now also delivers
+its value through the actual native close callback.
+
 ## Existing Geode 5 mods
 
 Prism 1.10.9 omits the required default for its custom array setting. The repair
@@ -144,3 +152,7 @@ The profile-import tool was additionally exercised with the 38 copied user mod
 packages, configuration, mod resources and private legacy saves: 136 files
 were transferred and all 38 package hashes matched. This verifies data transfer,
 not full behavioral compatibility in the new game process.
+
+Profile-import tests on PowerShell 5.1 and 7 additionally inject a destination
+write failure after copying begins. Existing destination files are restored,
+new destination files are removed and source files remain unchanged.

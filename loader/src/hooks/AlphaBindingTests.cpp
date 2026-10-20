@@ -30,6 +30,7 @@
 #include <Geode/binding/SpriteAnimationManager.hpp>
 #include <Geode/binding/ScrollViewPopup.hpp>
 #include <Geode/binding/SetTextPopup.hpp>
+#include <Geode/binding/SetTextPopupDelegate.hpp>
 #include <Geode/binding/CCTextInputNode.hpp>
 #include <Geode/binding/VirtualRowSource.hpp>
 #include <Geode/binding/UserInfoDelegate.hpp>
@@ -51,11 +52,22 @@ static_assert(sizeof(ScrollViewPopup) == 0x2a8);
 static_assert(sizeof(BrowseSmartTemplateLayer) == 0x2c8);
 static_assert(sizeof(CreateGuidelinesLayer) == 0x300);
 static_assert(sizeof(SetTextPopup) == 0x2f8);
+static_assert(sizeof(MusicDownloadManager) == 0x3d0);
 static_assert(std::is_abstract_v<KeybindSource>);
 static_assert(std::is_abstract_v<CCKeyboardActionManager>);
 static_assert(std::is_abstract_v<EditorWindowPopup>);
 static_assert(std::is_abstract_v<ScrollViewPopup>);
 namespace {
+    class AlphaTextReceiver final : public SetTextPopupDelegate {
+    public:
+        SetTextPopup* popup = nullptr;
+        std::string text;
+        void setTextPopupClosed(SetTextPopup* value, std::string result) override {
+            popup = value;
+            text = std::move(result);
+        }
+    };
+
     class AlphaEditorWindowFixture final : public EditorWindowPopup {
     public:
         void onBuildWindowContent() override {}
@@ -638,8 +650,46 @@ $on_game(Loaded) {
         }
         auto popup = SetTextPopup::create("fixture", "Enter text", 32,
             "Alpha fixture", "OK", false, 0.f, false, 0, 0);
-        return popup && popup->m_input && popup->m_input->getString() == "fixture" &&
-            popup->m_value == "fixture" && !popup->m_delegate;
+        if (!popup || !popup->m_input || popup->m_input->getString() != "fixture" ||
+            popup->m_value != "fixture" || popup->m_delegate) return false;
+        AlphaTextReceiver receiver;
+        popup->m_delegate = &receiver;
+        popup->onClose(nullptr);
+        return receiver.popup == popup && receiver.text == "fixture";
+    });
+
+    runBindingTest("Native local level ordering", [] {
+        auto manager = LocalLevelManager::get();
+        AlphaTestField levels(manager->m_localLevels, CCArray::create());
+        auto first = GJGameLevel::create();
+        auto second = GJGameLevel::create();
+        auto third = GJGameLevel::create();
+        first->m_levelIndex = second->m_levelIndex = third->m_levelIndex = 90;
+        for (auto level : {first, second, third}) manager->m_localLevels->addObject(level);
+        auto ordered = manager->updateLevelOrder() == 3 && first->m_levelIndex == 2 &&
+            second->m_levelIndex == 1 && third->m_levelIndex == 0;
+        manager->m_localLevels->removeAllObjects();
+        return ordered && manager->updateLevelOrder() == 0;
+    });
+
+    runBindingTest("Native music resource cache", [] {
+        auto manager = MusicDownloadManager::sharedState();
+        auto offset = reinterpret_cast<uintptr_t>(&manager->m_resourceSongUnorderedSet) -
+            reinterpret_cast<uintptr_t>(manager);
+        // Reject an incorrect SDK layout before touching native STL storage.
+        if (sizeof(MusicDownloadManager) != 0x3d0 || offset != 0x248) return false;
+        AlphaTestField songs(manager->m_resourceSongUnorderedSet, std::unordered_set<int>{717171});
+        return manager->isSongDownloaded(717171) && !manager->isSongDownloaded(2147483000);
+    });
+
+    runBindingTest("Native music manager construction", [] {
+        auto original = MusicDownloadManager::sharedState();
+        auto& singleton = *reinterpret_cast<MusicDownloadManager**>(base::get() + 0x90c070);
+        AlphaTestField restoreSingleton(singleton, original);
+        auto manager = std::make_unique<MusicDownloadManager>();
+        return !manager->m_activeDownloads && !manager->m_musicObjects &&
+            manager->m_customContentURL.empty() && manager->m_musicTags.empty() &&
+            manager->m_resourceSfxUnorderedSet.empty() && manager->m_resourceSongUnorderedSet.empty();
     });
 }
 #endif
