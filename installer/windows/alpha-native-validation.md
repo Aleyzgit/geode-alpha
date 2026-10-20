@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
 `d6f3312f0886b2c285fd0d2593ebabdc03b6ca0c`. The generated Windows build has
-5,451 populated native wrappers, all pointing into executable sections of
+5,452 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The updated upstream declarations include the current gameplay-layer state
@@ -40,7 +40,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-66 checks cover native constructors, level/list cache fixtures, fresh/expired
+68 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -65,6 +65,15 @@ fifteen enum values and invalid values. GameLevelManager::getStoredUserList
 uses 0x257b80 and the shared cache dictionary at 0x480. Windows UserListType
 includes Following (3) and Muted (4), alongside Friends (0) and Blocked (1).
 Tests verify lookups and selective resets across those four categories.
+
+LevelEditorLayer reserves 0x3e08 bytes, rather than the previous SDK's 0x3cf8.
+The native constructor is 0x3ec2f0. Its locked-layer count is at 0x3b88, saved
+positions at 0x3b90, removal flag at 0x3c98 and delayed-spawn vectors at
+0x3cc0/0x3cd8. Unknown session and tail storage is preserved. A fixture checks
+the layout and construction/destruction boundaries with allocated position,
+bit-vector, hash-map and string data. Native removeObject uses 0x3f21b0 and
+getLastObjectX uses 0x3fd290; their old Windows entries pointed elsewhere.
+This constructor fixture does not establish that every editor feature works.
 
 Additional fixtures exercise achievement/download lookups, username and ID
 caches, coin/completion namespaces, color interpolation, hue matrices, animation

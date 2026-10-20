@@ -625,6 +625,30 @@ alpha_patch_class(GeometryDash GameLevelManager
     "cocos2d::CCArray* getStoredUserList(UserListType type);"
     "cocos2d::CCArray* getStoredUserList(UserListType type) = win 0x257b80;")
 
+# Native editor allocation is 0x3e08. Its locked-layer count precedes the
+# saved-position vector at 0x3b90, and new session state precedes the removal
+# flag at 0x3c98. The delayed-spawn vectors are at 0x3cc0/0x3cd8. Preserve
+# the additional native tail, including containers initialized by the ctor.
+if (WIN32)
+    alpha_patch_class(GeometryDash LevelEditorLayer
+        "LevelEditorLayer() = imac" "LevelEditorLayer() = win 0x3ec2f0, imac")
+    alpha_patch_class(GeometryDash LevelEditorLayer
+        "    std::vector<cocos2d::CCPoint> m_savedPositions;"
+        "    int m_lockedLayerCount;\n    PAD = win 0x4;\n    std::vector<cocos2d::CCPoint> m_savedPositions;")
+    alpha_patch_class(GeometryDash LevelEditorLayer
+        "    bool m_removingAll;" "    PAD = win 0x70;\n    bool m_removingAll;")
+    alpha_patch_class(GeometryDash LevelEditorLayer
+        "    std::vector<int> m_unk3b48;"
+        "    std::vector<int> m_unk3b48;\n    PAD = win 0x98;")
+endif()
+# breakApartTextObject calls this removal path, which records optional undo
+# data, removes the object from the base layer and unregisters its triggers.
+alpha_patch_address(GeometryDash LevelEditorLayer
+    "void removeObject(GameObject* object, bool noUndo)" 0x3f21b0 0x223320)
+# EditorPauseLayer calls the same max-position scan as in the previous game.
+alpha_patch_address(GeometryDash LevelEditorLayer
+    "float getLastObjectX()" 0x3fd290 0x36d6b0)
+
 # GJRequestCell's native init is 0x158d20 (primary vtable 0x73cef0).
 # Its allocation is 0x248: score at 0x230, toggler at 0x238 and the
 # request-status-four flag at 0x240. The old popup callbacks have no native

@@ -98,7 +98,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. Sixty-six native checks passed in both
+Windows validation used Clang 21.1.8. Sixty-eight native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -122,7 +122,10 @@ interface. This removal reduces the placeholder count; it does not restore
 those older APIs or establish binary compatibility with their users.
 Native reward-stat keys and all four cached user-list categories are verified,
 including selective cache invalidation and preservation of unrelated entries.
-All 5,451 populated generated wrappers point into executable
+The editor layer reserves its native 0x3e08 bytes and aligns saved positions,
+session state and delayed-spawn containers with native construction/destruction.
+Two unrelated addresses for editor removal and last-object position are corrected.
+All 5,452 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its

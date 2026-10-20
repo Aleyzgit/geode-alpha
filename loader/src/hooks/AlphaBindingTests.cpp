@@ -27,6 +27,7 @@
 #include <Geode/binding/LocalLevelManager.hpp>
 #include <Geode/binding/KeybindSet.hpp>
 #include <Geode/binding/LevelUploadDelegate.hpp>
+#include <Geode/binding/LevelEditorLayer.hpp>
 #include <Geode/binding/LevelSearchLayer.hpp>
 #include <Geode/binding/MusicDownloadManager.hpp>
 #include <Geode/binding/OBB2D.hpp>
@@ -875,6 +876,39 @@ $on_game(Loaded) {
         }
         return dictionary->count() == 1 &&
             dictionary->objectForKey("alpha-unrelated-cache") == unrelated;
+    });
+
+    runBindingTest("Native editor layer layout", [] {
+        return sizeof(LevelEditorLayer) == 0x3e08 &&
+            offsetof(LevelEditorLayer, m_savedPositions) == 0x3b90 &&
+            offsetof(LevelEditorLayer, m_removingAll) == 0x3c98 &&
+            offsetof(LevelEditorLayer, m_delayedSpawnNodes) == 0x3cc0 &&
+            offsetof(LevelEditorLayer, m_unk3ae0) == 0x3cf0;
+    });
+
+    runBindingTest("Native editor construction boundary", [] {
+        alignas(LevelEditorLayer) std::array<uint8_t, sizeof(LevelEditorLayer) + 32> storage;
+        storage.fill(0xa5);
+        auto destroy = [](LevelEditorLayer* layer) { layer->~LevelEditorLayer(); };
+        std::unique_ptr<LevelEditorLayer, decltype(destroy)> editor(
+            new (storage.data()) LevelEditorLayer(), destroy);
+        bool valid = !editor->m_editorUI && editor->m_lockedLayerCount == 0 &&
+            editor->m_savedPositions.empty() && editor->m_sessionTime == 0 &&
+            !editor->m_removingAll && editor->m_delayedSpawnNodes.empty() &&
+            editor->m_delayedSpawnNodes2.empty() && editor->m_unk3ae0.empty();
+        editor->m_savedPositions.assign(10, CCPoint { 3.f, 5.f });
+        editor->m_blendingColors.assign(100, true);
+        editor->m_blendingColors2.assign(100, false);
+        editor->m_unk3ae0.emplace(17, 23);
+        editor->m_levelString = std::string(96, 'a');
+        {
+            AlphaTestField objects(editor->m_objects, CCArray::create());
+            valid = valid && editor->getLastObjectX() == 0.f;
+            editor->removeObject(nullptr, true);
+        }
+        editor.reset();
+        return valid && std::all_of(storage.begin() + sizeof(LevelEditorLayer), storage.end(),
+            [](uint8_t value) { return value == 0xa5; });
     });
 }
 #endif
