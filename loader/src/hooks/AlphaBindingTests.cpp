@@ -22,6 +22,7 @@
 #include <Geode/binding/GJLevelList.hpp>
 #include <Geode/binding/GJOptionsLayer.hpp>
 #include <Geode/binding/GJRequestCell.hpp>
+#include <Geode/binding/GJRewardItem.hpp>
 #include <Geode/binding/GJUserScore.hpp>
 #include <Geode/binding/LocalLevelManager.hpp>
 #include <Geode/binding/KeybindSet.hpp>
@@ -828,6 +829,52 @@ $on_game(Loaded) {
         // Autoreleased native row controls can retain the score until the
         // current frame's pool is drained, after this fixture returns.
         return selected && cleared && boundary;
+    });
+
+    runBindingTest("Native reward stat keys", [] {
+        std::array<char const*, 15> expected {
+            "18", "19", "17", "16", "20", "21", "", "", "",
+            "23", "24", "25", "26", "27", "43"
+        };
+        for (size_t index = 0; index < expected.size(); ++index) {
+            if (GJRewardItem::rewardItemToStat(static_cast<SpecialRewardItem>(index + 1)) !=
+                expected[index]) {
+                return false;
+            }
+        }
+        return GJRewardItem::rewardItemToStat(static_cast<SpecialRewardItem>(0)).empty() &&
+            GJRewardItem::rewardItemToStat(static_cast<SpecialRewardItem>(16)).empty() &&
+            GJRewardItem::rewardItemToStat(static_cast<SpecialRewardItem>(-1)).empty();
+    });
+
+    runBindingTest("Native cached user lists", [] {
+        auto manager = GameLevelManager::sharedState();
+        auto dictionary = CCDictionary::create();
+        AlphaTestField cache(manager->m_storedLevels, dictionary);
+        std::array<UserListType, 4> types {
+            UserListType::Friends, UserListType::Blocked, UserListType::Following, UserListType::Muted
+        };
+        std::array<char const*, 4> keys { "get_friends", "get_blocked", "get_following", "get_muted" };
+        std::array<CCArray*, 4> lists;
+        for (size_t index = 0; index < types.size(); ++index) {
+            lists[index] = CCArray::create();
+            lists[index]->addObject(CCString::create(keys[index]));
+            dictionary->setObject(lists[index], keys[index]);
+        }
+        auto unrelated = CCString::create("preserved");
+        dictionary->setObject(unrelated, "alpha-unrelated-cache");
+        if (manager->getStoredUserList(static_cast<UserListType>(2))) return false;
+        manager->resetStoredUserList(static_cast<UserListType>(2));
+        for (size_t index = 0; index < types.size(); ++index) {
+            if (manager->getStoredUserList(types[index]) != lists[index]) return false;
+            manager->resetStoredUserList(types[index]);
+            if (manager->getStoredUserList(types[index])) return false;
+            for (size_t remaining = index + 1; remaining < types.size(); ++remaining) {
+                if (manager->getStoredUserList(types[remaining]) != lists[remaining]) return false;
+            }
+        }
+        return dictionary->count() == 1 &&
+            dictionary->objectForKey("alpha-unrelated-cache") == unrelated;
     });
 }
 #endif

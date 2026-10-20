@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 67 Windows address placeholders are in
+respective modules. The remaining 66 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
 `d6f3312f0886b2c285fd0d2593ebabdc03b6ca0c`. The generated Windows build has
-5,449 populated native wrappers, all pointing into executable sections of
+5,451 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The updated upstream declarations include the current gameplay-layer state
@@ -40,7 +40,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-64 checks cover native constructors, level/list cache fixtures, fresh/expired
+66 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -59,6 +59,12 @@ state is at 0x31d. The native dictionary factory is 0x26c000. Tests check these
 positions, construction/destruction boundaries, long strings and native row
 selection using dictionary data. Normal C++ destruction releases its strings
 and CCNode base without calling the deleting destructor with missing flags.
+
+GJRewardItem::rewardItemToStat uses native 0x2f9190; the fixture covers all
+fifteen enum values and invalid values. GameLevelManager::getStoredUserList
+uses 0x257b80 and the shared cache dictionary at 0x480. Windows UserListType
+includes Following (3) and Muted (4), alongside Friends (0) and Blocked (1).
+Tests verify lookups and selective resets across those four categories.
 
 Additional fixtures exercise achievement/download lookups, username and ID
 caches, coin/completion namespaces, color interpolation, hue matrices, animation

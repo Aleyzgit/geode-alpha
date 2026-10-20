@@ -64,7 +64,7 @@ The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
 The GJGameLevel layout and editor build statistics now use the newer upstream
 bindings, including corrected level-browser, slider and secret-level methods.
-**67 Windows native-address placeholders remain**
+**66 Windows native-address placeholders remain**
 in the pinned game declarations. The engine declarations have no remaining
 Windows placeholders. Additional unsafe or incorrect entries have been corrected,
 including PVR functions that previously pointed outside executable memory.
@@ -98,7 +98,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. Sixty-four native checks passed in both
+Windows validation used Clang 21.1.8. Sixty-six native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -120,7 +120,9 @@ Four obsolete request-cell virtual callbacks and the removed request-popup
 actions are excluded from the Windows SDK, since they have no matching native
 interface. This removal reduces the placeholder count; it does not restore
 those older APIs or establish binary compatibility with their users.
-All 5,449 populated generated wrappers point into executable
+Native reward-stat keys and all four cached user-list categories are verified,
+including selective cache invalidation and preservation of unrelated entries.
+All 5,451 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its

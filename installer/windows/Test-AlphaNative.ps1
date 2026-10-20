@@ -71,7 +71,9 @@ $expected = @(
     'Native request cell boundary',
     'Native score layout',
     'Native score construction boundary',
-    'Native score dictionary and request selection'
+    'Native score dictionary and request selection',
+    'Native reward stat keys',
+    'Native cached user lists'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {

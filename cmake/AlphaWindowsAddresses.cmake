@@ -615,6 +615,16 @@ file(CONFIGURE OUTPUT "${alpha_search_inline}" CONTENT "${alpha_search_content}"
 alpha_patch_address(GeometryDash LevelSearchLayer "bool checkDiff(int diff)" 0x43aaf0)
 alpha_patch_address(GeometryDash LevelSearchLayer "bool checkTime(int time)" 0x43b120)
 
+# Two native callers and the fifteen-entry SpecialRewardItem jump table agree.
+# Shards/keys map to player-stat keys; orbs, diamonds and custom items return
+# an empty string, as do values outside the native enum range.
+alpha_patch_address(GeometryDash GJRewardItem
+    "static std::string rewardItemToStat(SpecialRewardItem rewardItem)" 0x2f9190)
+# Native cached user lists share GameLevelManager's dictionary at 0x480.
+alpha_patch_class(GeometryDash GameLevelManager
+    "cocos2d::CCArray* getStoredUserList(UserListType type);"
+    "cocos2d::CCArray* getStoredUserList(UserListType type) = win 0x257b80;")
+
 # GJRequestCell's native init is 0x158d20 (primary vtable 0x73cef0).
 # Its allocation is 0x248: score at 0x230, toggler at 0x238 and the
 # request-status-four flag at 0x240. The old popup callbacks have no native

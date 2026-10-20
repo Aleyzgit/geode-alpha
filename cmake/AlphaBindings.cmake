@@ -48,6 +48,13 @@ if (NOT GEODE_BINDINGS_PATH)
     # SoundStateContainer uses std::array without a direct include in its
     # generated header. Keep it valid independently of unity source ordering.
     set(alpha_enums "#include <array>\n${alpha_enums}")
+    string(REGEX MATCH "enum class UserListType \\{[^}]*\\};" alpha_old_user_lists "${alpha_enums}")
+    if (NOT alpha_old_user_lists)
+        message(FATAL_ERROR "Missing upstream UserListType enum")
+    endif()
+    string(REPLACE "${alpha_old_user_lists}"
+        "enum class UserListType {\n    Friends = 0,\n    Blocked = 1,\n#ifdef GEODE_IS_WINDOWS\n    Following = 3,\n    Muted = 4,\n#endif\n};"
+        alpha_enums "${alpha_enums}")
     file(READ "${CMAKE_CURRENT_LIST_DIR}/AlphaWindowsHttpTypes.hpp" alpha_http_types)
     string(REGEX MATCH "enum class GJHttpType \\{[^}]*\\};" alpha_old_http_types "${alpha_enums}")
     if (NOT alpha_old_http_types)
