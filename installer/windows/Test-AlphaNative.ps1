@@ -68,7 +68,10 @@ $expected = @(
     'Native suspended audio channels',
     'Native level search filters',
     'Native search page construction',
-    'Native request cell boundary'
+    'Native request cell boundary',
+    'Native score layout',
+    'Native score construction boundary',
+    'Native score dictionary and request selection'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {

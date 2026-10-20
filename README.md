@@ -98,7 +98,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. Sixty-one native checks passed in both
+Windows validation used Clang 21.1.8. Sixty-four native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -113,6 +113,9 @@ input state and construction/destruction of editor and scroll bases.
 Search-page construction and difficulty/length filters use the current layout.
 Request cells now use their native initialization address and toggler layout;
 a regression fixture checks that initialization stays inside the object.
+Score objects reserve the native 0x3b8 bytes and use the corrected social-link
+and request-state offsets. Fixtures cover heap-backed string destruction,
+native dictionary parsing and request selection through real row controls.
 Four obsolete request-cell virtual callbacks and the removed request-popup
 actions are excluded from the Windows SDK, since they have no matching native
 interface. This removal reduces the placeholder count; it does not restore

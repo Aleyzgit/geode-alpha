@@ -147,6 +147,28 @@ string(FIND "${alpha_manager_content}" "${alpha_manager_old}" alpha_manager_matc
 if (alpha_manager_match LESS 0)
     message(FATAL_ERROR "Unexpected GameLevelManager singleton implementation")
 endif()
+
+# Native GJUserScore construction/destruction allocates 0x3b8 bytes. The
+# dictionary factory stores request status at 0x2f8 and toggles at 0x31d;
+# new state precedes the social links and request flags. Preserve that state
+# without guessing the names of fields not yet identified.
+if (WIN32)
+    alpha_patch_class(GeometryDash GJUserScore
+        "    std::string m_youtubeURL;"
+        "    PAD = win 0xc;\n    std::string m_youtubeURL;")
+    alpha_patch_class(GeometryDash GJUserScore
+        "    bool m_newFriendRequest;" "    PAD = win 0x14;\n    bool m_newFriendRequest;")
+    # 0x218bc0 is a deleting destructor with an extra flags parameter. Its
+    # body only destroys the declared strings and the CCNode base.
+    alpha_patch_class(GeometryDash GJUserScore
+        "    virtual ~GJUserScore() = win 0x218bc0;"
+        "    virtual ~GJUserScore() = win inline;")
+    file(APPEND "${alpha_bindings_output}/inline/GJUserScore.cpp"
+        "\n#ifdef GEODE_IS_WINDOWS\nGJUserScore::~GJUserScore() {}\n#endif\n")
+    alpha_patch_class(GeometryDash GJUserScore
+        "static GJUserScore* create(cocos2d::CCDictionary* dict) = imac"
+        "static GJUserScore* create(cocos2d::CCDictionary* dict) = win 0x26c000, imac")
+endif()
 string(REPLACE "${alpha_manager_old}" "ref = new GameLevelManager();"
     alpha_manager_content "${alpha_manager_content}")
 file(CONFIGURE OUTPUT "${alpha_manager_inline}"
@@ -597,7 +619,7 @@ alpha_patch_address(GeometryDash LevelSearchLayer "bool checkTime(int time)" 0x4
 
 # GJRequestCell's native init is 0x158d20 (primary vtable 0x73cef0).
 # Its allocation is 0x248: score at 0x230, toggler at 0x238 and the
-# score-type-four flag at 0x240. The old popup callbacks have no native
+# request-status-four flag at 0x240. The old popup callbacks have no native
 # vtable slots in this version. Do not expose unrelated function addresses.
 if (WIN32)
     foreach(obsolete IN ITEMS
@@ -612,7 +634,7 @@ if (WIN32)
     endforeach()
     alpha_patch_class(GeometryDash GJRequestCell
         "    UploadActionPopup* m_popup;\n    CCMenuItemToggler* m_toggler;"
-        "    CCMenuItemToggler* m_toggler;\n    bool m_isScoreTypeFour;\n    PAD = win 0x7;")
+        "    CCMenuItemToggler* m_toggler;\n    bool m_requestStatusIsFour;\n    PAD = win 0x7;")
     alpha_patch_class(GeometryDash GJRequestCell
         "void onToggle(cocos2d::CCObject* sender);"
         "void onToggle(cocos2d::CCObject* sender) = win 0x1592a0;")

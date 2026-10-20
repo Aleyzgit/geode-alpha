@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 79 Windows address placeholders are in
+respective modules. The remaining 73 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
 `ae234b568310731bcf6453f846826a1e772eb6db`. The generated Windows build has
-5,440 populated native wrappers, all pointing into executable sections of
+5,442 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The GameLevelManager allocation is 0x690 bytes. Constructor initialization,
@@ -34,12 +34,25 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-58 checks cover native constructors, level/list cache fixtures, fresh/expired
+64 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
 temporary manager fields before saving. A loader test token is persisted in
 the private profile. These checks do not exercise every game or mod feature.
+
+GJRequestCell uses its native init at 0x158d20, with a score pointer at 0x230,
+toggler at 0x238 and request-status flag at 0x240. Its former popup callback
+slots and request-popup actions are absent from the current Windows interface;
+they are excluded rather than replaced with unrelated addresses. A canary
+fixture reproduced writes outside the cell before restoring its native init.
+
+GJUserScore allocates 0x3b8 bytes; the previous SDK reserved only 0x398.
+Social links start at 0x1e0, friend-request status is at 0x2f8 and selection
+state is at 0x31d. The native dictionary factory is 0x26c000. Tests check these
+positions, construction/destruction boundaries, long strings and native row
+selection using dictionary data. Normal C++ destruction releases its strings
+and CCNode base without calling the deleting destructor with missing flags.
 
 Additional fixtures exercise achievement/download lookups, username and ID
 caches, coin/completion namespaces, color interpolation, hue matrices, animation

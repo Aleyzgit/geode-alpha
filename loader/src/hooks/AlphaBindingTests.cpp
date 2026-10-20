@@ -3,6 +3,7 @@
 #include <Geode/binding/ButtonSprite.hpp>
 #include <Geode/binding/BrowseSmartTemplateLayer.hpp>
 #include <Geode/binding/CCAnimateFrameCache.hpp>
+#include <Geode/binding/CCMenuItemToggler.hpp>
 #include <Geode/binding/CCSpriteWithHue.hpp>
 #include <Geode/binding/ColorAction.hpp>
 #include <Geode/binding/ColorChannelSprite.hpp>
@@ -21,6 +22,7 @@
 #include <Geode/binding/GJLevelList.hpp>
 #include <Geode/binding/GJOptionsLayer.hpp>
 #include <Geode/binding/GJRequestCell.hpp>
+#include <Geode/binding/GJUserScore.hpp>
 #include <Geode/binding/LocalLevelManager.hpp>
 #include <Geode/binding/KeybindSet.hpp>
 #include <Geode/binding/LevelUploadDelegate.hpp>
@@ -67,8 +69,7 @@ namespace {
     public:
         std::array<uint8_t, 32> guard;
         AlphaRequestCanary() : GJRequestCell("alpha-request-fixture", 320.f, 40.f) {
-            // Keep the old SDK's fields safe to destroy while testing its init
-            // entry. The tail absorbs writes from an incorrectly bound class.
+            // Absorb the former wrong-class init writes inside this allocation.
             std::memset(reinterpret_cast<uint8_t*>(this) + 0x230, 0, 0x18);
             guard.fill(0xa5);
         }
@@ -758,6 +759,75 @@ $on_game(Loaded) {
         auto initialized = cell->GJRequestCell::init();
         return initialized && std::all_of(cell->guard.begin(), cell->guard.end(),
             [](uint8_t value) { return value == 0xa5; });
+    });
+
+    runBindingTest("Native score layout", [] {
+        return sizeof(GJUserScore) == 0x3b8 &&
+            offsetof(GJUserScore, m_scoreType) == 0x180 &&
+            offsetof(GJUserScore, m_friendReqStatus) == 0x2f8 &&
+            offsetof(GJUserScore, m_toggled) == 0x31d;
+    });
+
+    runBindingTest("Native score construction boundary", [] {
+        alignas(GJUserScore) std::array<uint8_t, sizeof(GJUserScore) + 32> storage;
+        storage.fill(0xa5);
+        auto destroy = [](GJUserScore* score) { score->~GJUserScore(); };
+        std::unique_ptr<GJUserScore, decltype(destroy)> score(
+            new (storage.data()) GJUserScore(), destroy);
+        bool valid = score->init() && score->m_color2 == 3 &&
+            score->m_playerCube == 1 && score->m_playerStreak == 1 &&
+            score->m_friendReqStatus == 0 && !score->m_toggled;
+        for (auto field : { &score->m_userName, &score->m_userUDID,
+            &score->m_youtubeURL, &score->m_twitterURL, &score->m_twitchURL,
+            &score->m_discordUsername, &score->m_instagramURL, &score->m_tiktokURL,
+            &score->m_customString, &score->m_unkString, &score->m_demonInfo,
+            &score->m_starsInfo, &score->m_platformerInfo }) {
+            *field = std::string(96, 'a');
+        }
+        score.reset();
+        return valid && std::all_of(storage.begin() + sizeof(GJUserScore), storage.end(),
+            [](uint8_t value) { return value == 0xa5; });
+    });
+
+    runBindingTest("Native score dictionary and request selection", [] {
+        auto data = CCDictionary::create();
+        for (auto [key, value] : std::initializer_list<std::pair<char const*, char const*>> {
+            { "1", "AlphaFixture" }, { "2", "2323" }, { "3", "123" },
+            { "46", "456" }, { "52", "789" }, { "9", "1" }, { "11", "3" },
+            { "29", "1" }, { "31", "4" },
+            { "38", "8" }, { "39", "9" }, { "40", "10" }
+        }) {
+            data->setObject(CCString::create(value), key);
+        }
+        auto score = GJUserScore::create(data);
+        if (!score || score->m_userName != "AlphaFixture" || score->m_userID != 2323 ||
+            score->m_stars != 123 || score->m_diamonds != 456 || score->m_moons != 789 ||
+            score->m_friendReqStatus != 4 || score->m_newMsgCount != 8 ||
+            score->m_friendReqCount != 9 || score->m_newFriendCount != 10) {
+            return false;
+        }
+        auto cell = std::make_unique<AlphaRequestCanary>();
+        auto references = score->retainCount();
+        cell->loadFromScore(score);
+        if (cell->m_score != score || !cell->m_toggler || !cell->m_requestStatusIsFour ||
+            score->retainCount() <= references) {
+            return false;
+        }
+        score->m_toggled = false;
+        cell->onToggle(nullptr);
+        cell->updateToggle();
+        bool selected = score->m_toggled && cell->m_toggler->isToggled();
+        cell->onToggle(nullptr);
+        cell->updateToggle();
+        bool cleared = !score->m_toggled && !cell->m_toggler->isToggled();
+        // The fixture has account ID zero, so this native action opens no page.
+        cell->onViewProfile(nullptr);
+        bool boundary = std::all_of(cell->guard.begin(), cell->guard.end(),
+            [](uint8_t value) { return value == 0xa5; });
+        cell.reset();
+        // Autoreleased native row controls can retain the score until the
+        // current frame's pool is drained, after this fixture returns.
+        return selected && cleared && boundary;
     });
 }
 #endif
