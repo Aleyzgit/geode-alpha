@@ -72,6 +72,7 @@
 #include <Geode/binding/UploadActionPopup.hpp>
 #include <Geode/binding/TableViewCellDelegate.hpp>
 #include <Geode/binding/TabbedPopupLayer.hpp>
+#include <Geode/binding/UIButtonConfig.hpp>
 #include <Geode/cocos/particle_nodes/CCParticleSystemQuad.h>
 #include <Geode/cocos/CCScheduler.h>
 #include <Geode/cocos/cocoa/CCAutoreleasePool.h>
@@ -582,6 +583,48 @@ $on_game(Loaded) {
         manager->m_platformAchievements->setObject(value, "alpha-achievement");
         return manager->getAchievementsWithID("alpha-achievement") == value &&
             !manager->getAchievementsWithID("alpha-missing");
+    });
+
+    runBindingTest("Native particle allocation boundary", [] {
+        if (sizeof(CCParticleSystem) != 0x318 || sizeof(CCParticleSystemQuad) != 0x348 ||
+            offsetof(CCParticleSystemQuad, m_pQuads) != 0x318 ||
+            offsetof(CCParticleSystemQuad, m_tTextureRect) != 0x330 ||
+            offsetof(CCParticleSystemQuad, m_uOpacity) != 0x346) return false;
+        alignas(CCParticleSystemQuad) std::array<uint8_t, sizeof(CCParticleSystemQuad) + 32> storage;
+        storage.fill(0xa5);
+        auto particles = new (storage.data()) CCParticleSystemQuad();
+        auto destroy = [](CCParticleSystemQuad* value) { value->~CCParticleSystemQuad(); };
+        std::unique_ptr<CCParticleSystemQuad, decltype(destroy)> lifetime(particles, destroy);
+        if (!particles->initWithTotalParticles(4, false) || particles->getTotalParticles() != 4 ||
+            !particles->m_pQuads || !particles->m_pIndices || particles->m_uOpacity != 255) return false;
+        particles->m_particleDrawCost = 10.f;
+        if (std::abs(particles->getParticleDrawCost() - 0.78539819f) > 0.00001f) return false;
+        lifetime.reset();
+        return std::all_of(storage.begin() + sizeof(CCParticleSystemQuad), storage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native single button configuration reset", [] {
+        if (sizeof(UIButtonConfig) != 0x28) return false;
+        alignas(UIButtonConfig) std::array<uint8_t, sizeof(UIButtonConfig) + 32> storage;
+        storage.fill(0xa5);
+        auto config = new (storage.data()) UIButtonConfig();
+        auto defaults = [config] {
+            return config->m_width == 200 && config->m_height == 200 && config->m_deadzone == 0.f &&
+                config->m_scale == 1.f && config->m_opacity == 255 && config->m_radius == 10.f &&
+                !config->m_modeB && !config->m_snap && config->m_position == CCPoint(95.f, 196.f) &&
+                config->m_oneButton && !config->m_player2 && !config->m_split;
+        };
+        config->resetOneBtn();
+        if (!defaults()) return false;
+        config->m_width = 17;
+        config->m_modeB = config->m_snap = config->m_player2 = config->m_split = true;
+        config->m_position = CCPoint {-100.f, 200.f};
+        config->resetOneBtn();
+        auto valid = defaults();
+        config->~UIButtonConfig();
+        return valid && std::all_of(storage.begin() + sizeof(UIButtonConfig), storage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
     });
 
     runBindingTest("Native achievement unlock application", [] {
@@ -1578,10 +1621,10 @@ $on_game(Loaded) {
         auto destroy = [](NumberInputLayer* layer) { layer->~NumberInputLayer(); };
         std::unique_ptr<NumberInputLayer, decltype(destroy)> popup(
             new (storage.data()) NumberInputLayer(), destroy);
-        bool valid = !popup->m_titleLabel && !popup->m_okButton && !popup->m_delegate &&
+        bool valid = !popup->m_title && !popup->m_okButton && !popup->m_delegate &&
             popup->m_minimum == 4 && popup->m_maximum == 4 &&
-            popup->m_inputPrefix.empty() && popup->m_inputString.empty();
-        popup->m_inputPrefix = std::string(96, 'p');
+            popup->m_prefixString.empty() && popup->m_inputString.empty();
+        popup->m_prefixString = std::string(96, 'p');
         popup->m_inputString = std::string(96, '7');
         popup.reset();
         return valid && std::all_of(storage.begin() + sizeof(NumberInputLayer), storage.end(),
@@ -1590,7 +1633,7 @@ $on_game(Loaded) {
 
     runBindingTest("Native number input controls and delegate", [] {
         auto popup = NumberInputLayer::create();
-        if (!popup || !popup->m_inputLabel || !popup->m_titleLabel || !popup->m_okButton) return false;
+        if (!popup || !popup->m_inputLabel || !popup->m_title || !popup->m_okButton) return false;
         popup->m_minimum = 2;
         popup->m_maximum = 4;
         popup->updateNumberState();
@@ -1609,7 +1652,7 @@ $on_game(Loaded) {
         popup->deleteLast();
         if (popup->m_inputString != "7" || popup->m_okButton->isEnabled()) return false;
         popup->m_inputString = "7359";
-        popup->m_inputPrefix = "ID: ";
+        popup->m_prefixString = "ID: ";
         popup->updateNumberState();
         if (std::string(popup->m_inputLabel->getString()) != "ID: 7359" ||
             !popup->m_okButton->isEnabled()) return false;
@@ -1624,9 +1667,9 @@ $on_game(Loaded) {
     runBindingTest("Native arithmetic gate construction", [] {
         auto popup = ParentalGateLayer::create();
         // Exercise construction only; do not submit or change any settings.
-        return popup && popup->m_inputLabel && popup->m_titleLabel && popup->m_okButton &&
-            !popup->m_inputPrefix.empty() &&
-            std::string(popup->m_inputLabel->getString()) == popup->m_inputPrefix + popup->m_inputString;
+        return popup && popup->m_inputLabel && popup->m_title && popup->m_okButton &&
+            !popup->m_prefixString.empty() &&
+            std::string(popup->m_inputLabel->getString()) == popup->m_prefixString + popup->m_inputString;
     });
 
     runBindingTest("Native animated counter updates", [] {

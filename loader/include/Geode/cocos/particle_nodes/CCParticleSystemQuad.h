@@ -161,6 +161,10 @@ public:
     GLushort m_uParticleIdx;
     // @note Robtop Addition
     GLubyte m_uOpacity;
+#ifndef GEODE_IS_WINDOWS
+    // @note Robtop Addition
+    void* m_pUnk;
+#endif
 
 public:
     /**

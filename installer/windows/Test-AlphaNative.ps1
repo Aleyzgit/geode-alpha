@@ -33,6 +33,8 @@ $expected = @(
     'Invalid platform rejected',
     'Async mod save',
     'Native achievement lookup',
+    'Native particle allocation boundary',
+    'Native single button configuration reset',
     'Native achievement unlock application',
     'Native item information factories',
     'Native local level deletion',

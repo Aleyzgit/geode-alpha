@@ -64,6 +64,7 @@ alpha_patch_address(GeometryDash GameManager
     "void completedAchievement(std::string key)" 0x278140)
 alpha_patch_address(GeometryDash ItemInfoPopup
     "static ItemInfoPopup* create(int id, UnlockType type)" 0x3841e0)
+alpha_patch_address(GeometryDash UIButtonConfig "void resetOneBtn()" 0x275970)
 
 # AppDelegate's primary table is 0x719f88; its CCSceneDelegate subobject is
 # at 0xd8 with table 0x719f78. These callbacks remain native Windows APIs.
@@ -231,12 +232,8 @@ alpha_patch_address(GeometryDash GameToolbox
 alpha_patch_address(GeometryDash GameToolbox
     "static void mergeDictsSaveLargestInt(cocos2d::CCDictionary* toDict, cocos2d::CCDictionary* fromDict)" 0x6eac0)
 
-# Two additional native flags shift the strings and trailing list fields by
-# eight bytes. create allocates 0x250; init writes m_levelsDict at 0x240 and
-# m_M_ID at 0x24c, which getLocalLevelList compares against the requested ID.
-alpha_patch_class(GeometryDash GJLevelList
-    "    std::string m_creatorName;"
-    "    PAD = win 0x2;\n    std::string m_creatorName;")
+# Upstream now includes the additional list state before its strings. Native
+# create allocates 0x250, with m_levelsDict at 0x240 and m_M_ID at 0x24c.
 
 # libcocos2d.dll SHA-256
 # 79c2f6567e5851225520803f460c6c5f6f49a2eac9afb8f3bd88d4c5697bef4e.
@@ -707,37 +704,13 @@ if (WIN32)
         "    NumberInputLayer() = inline;"
         "    NumberInputLayer() = win 0x4a1060, inline;")
     alpha_patch_class(GeometryDash NumberInputLayer
-        "    void onDone(cocos2d::CCObject* sender) = win inline;"
+        "    void onDone(cocos2d::CCObject* sender) = win 0x4a1820;"
         "    virtual void onDone(cocos2d::CCObject* sender) = win 0x4a1b10;")
-    alpha_patch_class(GeometryDash NumberInputLayer
-        "    CCMenuItemSpriteExtra* m_okButton;"
-        "    cocos2d::CCLabelBMFont* m_titleLabel;\n    CCMenuItemSpriteExtra* m_okButton;")
-    alpha_patch_class(GeometryDash NumberInputLayer
-        "    std::string m_inputString;"
-        "    std::string m_inputPrefix;\n    std::string m_inputString;")
-    set(alpha_number_inline "${alpha_bindings_output}/inline/NumberInputLayer.cpp")
-    file(READ "${alpha_number_inline}" alpha_number_content)
-    set(alpha_number_done [=[void NumberInputLayer::onDone(cocos2d::CCObject* sender) {
-    if (m_delegate) m_delegate->numberInputClosed(this);
-    this->onClose(nullptr);
-}]=])
-    foreach(body IN ITEMS "${alpha_number_done}")
-        string(FIND "${alpha_number_content}" "${body}" alpha_number_match)
-        if (alpha_number_match LESS 0)
-            message(FATAL_ERROR "Unexpected NumberInputLayer inline implementation")
-        endif()
-        string(REPLACE "${body}" "" alpha_number_content "${alpha_number_content}")
-    endforeach()
-    file(CONFIGURE OUTPUT "${alpha_number_inline}" CONTENT "${alpha_number_content}" @ONLY)
+    # Use upstream's title/prefix fields and iOS-only inline implementations.
     # The native derived factory reserves one additional integer and alignment.
     alpha_patch_class(GeometryDash ParentalGateLayer
         "static ParentalGateLayer* create() = m1"
         "static ParentalGateLayer* create() = win 0x4d3ba0, m1")
-    # The upstream tail compensates for its undersized NumberInputLayer.
-    # With that base corrected, only the native solution integer remains.
-    alpha_patch_class(GeometryDash ParentalGateLayer
-        "    std::string m_inputtedValue;\n    void* m_unknown; // this may be incorrect\n    int m_solution;"
-        "    int m_solution;")
     file(WRITE "${alpha_bindings_output}/inline/ParentalGateLayer.cpp"
         "#include <Geode/binding/ParentalGateLayer.hpp>\n\n#ifdef GEODE_IS_WINDOWS\nParentalGateLayer::ParentalGateLayer() : m_solution(0) {}\n#endif\n")
 endif()

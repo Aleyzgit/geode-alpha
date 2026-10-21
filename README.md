@@ -64,7 +64,7 @@ The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
 The GJGameLevel layout and editor build statistics now use the newer upstream
 bindings, including corrected level-browser, slider and secret-level methods.
-**40 Windows native-address placeholders remain**
+**39 Windows native-address placeholders remain**
 in the pinned game declarations. The engine declarations have no remaining
 Windows placeholders. Additional unsafe or incorrect entries have been corrected,
 including PVR functions that previously pointed outside executable memory.
@@ -84,7 +84,7 @@ convert old DLLs. Some mods need to be rebuilt or ported by their authors.
 Platform checks and package hash checks remain enabled.
 
 Build with Clang and the normal upstream CMake workflow. Bindings are pinned
-to `9a9af08340e446a970d434502f84cc5de52251e5`; the fork's verified native
+to `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`; the fork's verified native
 address corrections are applied in the build directory. To reject a build
 while Windows placeholders remain, configure with
 `-DGEODE_ALPHA_REQUIRE_COMPLETE_BINDINGS=ON`. This check is expected to fail
@@ -98,7 +98,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. The 116 native checks passed in both
+Windows validation used Clang 21.1.8. The 118 native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -153,10 +153,10 @@ empty lists. Paged reloads dispatch through their native request/clear callbacks
 Picker interfaces now require typed recipient-array/count and ID-name receivers.
 Two obsolete Windows popup callbacks are excluded because their native vtables
 have no corresponding slot; this does not restore those old APIs.
-The current upstream v6 changes are integrated through `4457dd8`, including
-popup touch priority and updated async dependencies. Fixtures verify balanced
+The current upstream v6 changes are integrated through `fed6cfb`, including
+popup touch priority, particle draw cost and updated async dependencies. Fixtures verify balanced
 popup priority registration and SDK arithmetic-popup construction.
-A comparison against 548 upstream Windows size references still reports 139
+A comparison against 548 upstream Windows size references still reports 136
 differences to investigate; some reference sizes conflict with verified native
 construction. The class-layout port remains incomplete.
 The effect manager reserves its native 0x828 bytes, including new state before
@@ -176,7 +176,10 @@ Fixtures exercise sprite replacement and object/group/color filters in a fresh
 editor. Native level deletion preserves progress while removing downloaded
 data; tests use temporary lists, levels and caches. Achievement unlocks and
 item-info factories are also restored and tested with isolated unlock data.
-All 5,467 populated generated wrappers point into executable
+Particle construction uses the native Windows 0x348-byte quad allocation;
+the extra pointer used on other platforms is excluded from Windows. Guarded
+fixtures exercise particle initialization, draw cost and single-button defaults.
+All 5,469 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its
