@@ -4,6 +4,8 @@
 #include <Geode/cocos/CCDirector.h>
 #include <Geode/cocos/keypad_dispatcher/CCKeypadDispatcher.h>
 #include <Geode/cocos/platform/CCEGLView.h>
+#include <Geode/cocos/robtop/keyboard_dispatcher/CCKeyboardDispatcher.h>
+#include <Geode/cocos/robtop/mouse_dispatcher/CCMouseDispatcher.h>
 #include <android/keycodes.h>
 #include <android/input.h>
 #include <jni.h>
