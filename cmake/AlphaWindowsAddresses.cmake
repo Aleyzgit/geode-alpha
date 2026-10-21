@@ -711,6 +711,26 @@ alpha_patch_address(GeometryDash CCCounterLabel "void updateCounter(float dt)" 0
 alpha_patch_address(GeometryDash GJBaseGameLayer
     "void updateCounters(int itemId, int value)" 0x33cb90)
 
+# Native construction reserves 0x828 and initializes a new integer at 0x3f0.
+# The two item-state sets start at 0x3f8/0x438; later trigger-ID storage is
+# therefore at 0x560, not the previous SDK's 0x558.
+if (WIN32)
+    alpha_patch_class(GeometryDash GJEffectManager
+        "    // GJEffectManager();" "    GJEffectManager() = win 0x362520;")
+    alpha_patch_class(GeometryDash GJEffectManager
+        "    std::unordered_set<int> m_unk3f0;"
+        "    int m_unk3f0Value;\n    PAD = win 0x4;\n    std::unordered_set<int> m_unk3f0;")
+    # The old native store method only inserts this unique pair. Supply the
+    # equivalent SDK implementation against the corrected current container.
+    alpha_patch_class(GeometryDash GJEffectManager
+        "void storeTriggeredID(int objectUniqueID, int playerUniqueID) = imac"
+        "void storeTriggeredID(int objectUniqueID, int playerUniqueID) = win inline, imac")
+    file(APPEND "${alpha_bindings_output}/inline/GJEffectManager.cpp"
+        "\n#ifdef GEODE_IS_WINDOWS\nvoid GJEffectManager::storeTriggeredID(int objectUniqueID, int playerUniqueID) {\n    m_unkMap498.emplace(objectUniqueID, playerUniqueID);\n}\n#endif\n")
+endif()
+alpha_patch_address(GeometryDash GJEffectManager
+    "void removeTriggeredID(int objectUniqueID, int playerUniqueID)" 0x36c850)
+
 # Compare the SDK member-pointer slots with native RTTI tables, not just the
 # presence of an executable address. New callback groups moved older slots.
 if (WIN32)

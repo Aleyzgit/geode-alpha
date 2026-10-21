@@ -1401,6 +1401,56 @@ $on_game(Loaded) {
         return sizeof(ParentalGateLayer) == 0x308 &&
             checkConstructionBoundary<ParentalGateLayer>();
     });
+
+    runBindingTest("Native effect manager layout", [] {
+        return sizeof(GJEffectManager) == 0x828 &&
+            offsetof(GJEffectManager, m_unk3f0) == 0x3f8 &&
+            offsetof(GJEffectManager, m_timerItemMap) == 0x478 &&
+            offsetof(GJEffectManager, m_unkMap498) == 0x560 &&
+            offsetof(GJEffectManager, m_spawnTriggerActions) == 0x5b0;
+    });
+
+    runBindingTest("Native triggered ID removal", [] {
+        if (sizeof(GJEffectManager) != 0x828 ||
+            offsetof(GJEffectManager, m_unkMap498) != 0x560) return false;
+        auto effects = GJEffectManager::create();
+        if (!effects || !effects->m_unkMap498.empty()) return false;
+        for (auto pair : {std::pair{17, 23}, std::pair{17, 29}, std::pair{19, 23}, std::pair{17, 23}}) {
+            effects->storeTriggeredID(pair.first, pair.second);
+        }
+        if (effects->m_unkMap498.size() != 3 || !effects->hasBeenTriggered(17, 23) ||
+            effects->hasBeenTriggered(17, 24)) return false;
+        effects->removeTriggeredID(17, 23);
+        if (effects->hasBeenTriggered(17, 23) ||
+            effects->m_unkMap498 != std::set<std::pair<int, int>>{{17, 29}, {19, 23}}) return false;
+        effects->removeTriggeredID(99, 23);
+        if (effects->m_unkMap498.size() != 2) return false;
+        effects->removeTriggeredID(17, 29);
+        if (effects->m_unkMap498 != std::set<std::pair<int, int>>{{19, 23}}) return false;
+        effects->resetTriggeredIDs();
+        effects->removeTriggeredID(19, 23);
+        return effects->m_unkMap498.empty();
+    });
+
+    runBindingTest("Native effect manager SDK construction", [] {
+        alignas(GJEffectManager) std::array<uint8_t, sizeof(GJEffectManager) + 32> storage;
+        storage.fill(0xa5);
+        auto destroy = [](GJEffectManager* value) { value->GJEffectManager::~GJEffectManager(); };
+        std::unique_ptr<GJEffectManager, decltype(destroy)> effects(
+            new (storage.data()) GJEffectManager(), destroy);
+        bool valid = effects->m_unk3f0Value == 0 && effects->m_unk3f0.empty() &&
+            effects->m_unk430.empty() && effects->m_unkMap498.empty() &&
+            effects->m_timerItemMap.empty() && effects->m_spawnTriggerActions.empty();
+        effects->m_unk3f0.insert(17);
+        effects->m_unk430.insert(23);
+        effects->m_unkMap498.emplace(17, 23);
+        effects->removeTriggeredID(17, 23);
+        valid = valid && effects->m_unk3f0.contains(17) && effects->m_unk430.contains(23) &&
+            effects->m_unkMap498.empty();
+        effects.reset();
+        return valid && std::all_of(storage.begin() + sizeof(GJEffectManager), storage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
+    });
 }
 #ifdef __clang__
     #pragma clang diagnostic pop

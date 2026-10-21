@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 53 Windows address placeholders are in
+respective modules. The remaining 52 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `4457dd8` and the bindings revision is
 `9a9af08340e446a970d434502f84cc5de52251e5`. The generated Windows build has
-5,446 populated native wrappers, all pointing into executable sections of
+5,448 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The updated upstream declarations include the current gameplay-layer state
@@ -40,7 +40,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-93 checks cover native constructors, level/list cache fixtures, fresh/expired
+96 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -137,7 +137,7 @@ pointer fields and paged-popup storage are used without duplicate padding.
 TabbedPopupLayer's Windows tail remains the verified 0x48 bytes.
 
 A separate compiled-size comparison covers all 548 upstream Windows references.
-It reports 142 differences requiring native verification; these are not a list
+It reports 141 differences requiring native verification; these are not a list
 of proven defects because some reference sizes are inconsistent with native
 construction. For example, GameManager's fields start before the reference's
 claimed GManager size. No automatic padding is applied from this comparison.
@@ -151,6 +151,17 @@ checks that construction/destruction stay within its 0x308 bytes.
 The release placeholder counter ignores comments and quoted strings. Seven
 CMake fixtures verify that commented-out old declarations do not block releases
 and that real unresolved declarations, including after URL defaults, still count.
+
+GJEffectManager's native constructor is 0x362520 and allocation is 0x828 bytes.
+Its new integer at 0x3f0 moves the item-state sets to 0x3f8/0x438, timer map
+to 0x478, triggered-ID set to 0x560 and spawn vector to 0x5b0. Earlier item
+count storage remains at 0x330. A layout fixture failed before this correction.
+Native removeTriggeredID (0x36c850) erases the requested object/player pair;
+tests preserve neighboring pairs, allow absent pairs and remove from empty sets.
+The SDK storeTriggeredID implementation inserts the same unique pair, matching
+the earlier native method's set-insertion behavior. Fixtures cover duplicates,
+SDK hasBeenTriggered/resetTriggeredIDs and guarded native construction with
+populated containers, including preservation of unrelated item-state sets.
 
 GJLevelList::reorderLevel uses 0x272d00, also called by native list-row actions;
 tests cover moves in both directions, clamped positions, absent IDs, one-item

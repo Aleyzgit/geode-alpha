@@ -100,7 +100,10 @@ $expected = @(
     'Native popup virtual boundaries',
     'Native typed picker contracts',
     'Native popup touch priority lifetime',
-    'Native arithmetic gate SDK construction'
+    'Native arithmetic gate SDK construction',
+    'Native effect manager layout',
+    'Native triggered ID removal',
+    'Native effect manager SDK construction'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {
