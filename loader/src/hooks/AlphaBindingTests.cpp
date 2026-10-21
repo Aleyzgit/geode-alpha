@@ -14,6 +14,8 @@
 #include <Geode/binding/EditorUI.hpp>
 #include <Geode/binding/EditorWindowPopup.hpp>
 #include <Geode/binding/FMODAudioEngine.hpp>
+#include <Geode/binding/FriendPickerDelegate.hpp>
+#include <Geode/binding/IDNameBrowserDelegate.hpp>
 #include <Geode/binding/GameLevelManager.hpp>
 #include <Geode/binding/GameManager.hpp>
 #include <Geode/binding/GameSettingsLayer.hpp>
@@ -39,6 +41,8 @@
 #include <Geode/binding/LevelListLayer.hpp>
 #include <Geode/binding/LevelSearchLayer.hpp>
 #include <Geode/binding/MusicDownloadManager.hpp>
+#include <Geode/binding/MusicBrowser.hpp>
+#include <Geode/binding/NewgroundsInfoLayer.hpp>
 #include <Geode/binding/NumberInputLayer.hpp>
 #include <Geode/binding/NumberInputDelegate.hpp>
 #include <Geode/binding/ParentalGateLayer.hpp>
@@ -46,6 +50,7 @@
 #include <Geode/binding/PulseEffectAction.hpp>
 #include <Geode/binding/PagedListPopup.hpp>
 #include <Geode/binding/PlayLayer.hpp>
+#include <Geode/binding/ReportQueuePopup.hpp>
 #include <Geode/binding/SFXBrowser.hpp>
 #include <Geode/binding/SpriteAnimationManager.hpp>
 #include <Geode/binding/ScrollViewPopup.hpp>
@@ -90,6 +95,38 @@ static_assert(std::is_abstract_v<CCKeyboardActionManager>);
 static_assert(std::is_abstract_v<EditorWindowPopup>);
 static_assert(std::is_abstract_v<ScrollViewPopup>);
 namespace {
+    class AlphaMusicShape final : public MusicBrowser {
+    public:
+        virtual void boundary() {}
+    };
+    class AlphaNewgroundsShape final : public NewgroundsInfoLayer {
+    public:
+        virtual void boundary() {}
+    };
+
+    class AlphaPickerFixture final : public FriendPickerDelegate, public IDNameBrowserDelegate {
+    public:
+        CCArray* recipients = nullptr;
+        int selectedID = -1;
+        unsigned int selectedRecipientCount() override { return recipients ? recipients->count() : 0; }
+        CCArray* selectedRecipients() override { return recipients; }
+        void clearRecipients() override { if (recipients) recipients->removeAllObjects(); }
+        void idNameBrowserClosed(IDNameBrowserPopup*, int id) override { selectedID = id; }
+    };
+
+    class AlphaPagedReloadFixture final : public PagedListPopup {
+    public:
+        int requested = -1;
+        unsigned requests = 0;
+        unsigned clears = 0;
+        int requestPage(int page) override {
+            requested = page;
+            ++requests;
+            return 1;
+        }
+        void clearPageContent() override { ++clears; }
+    };
+
     class AlphaTabbedFixture final : public TabbedPopupLayer {};
     class AlphaBrowserFixture final : public LevelBrowserLayer {};
     class AlphaListFixture final : public LevelListLayer {};
@@ -1220,7 +1257,9 @@ $on_game(Loaded) {
             table->allowsCustomSFXActions() && table->isCustomIDSelected(717171) &&
             !table->isCustomIDSelected(717172) && table->inCustomSFXTree() &&
             table->showsSFXInfoButton() && !table->shouldSnapToSelected() &&
-            table->getCellDelegateType() == -1;
+            table->getCellDelegateType() == -1 &&
+            selection.TableViewCellDelegate::getSelectedCellCustomIdx() == 0 &&
+            !selection.TableViewCellDelegate::allowsCustomSFXActions();
     });
 
     runBindingTest("Native tab and browser layouts", [] {
@@ -1252,6 +1291,89 @@ $on_game(Loaded) {
             delegate->dropDownLayerWillClose(nullptr);
             return settings->m_gameLayer == editor && settings->getChildrenCount() > 0;
         });
+    });
+
+    runBindingTest("Native level list reordering", [] {
+        auto list = GJLevelList::create();
+        if (!list) return false;
+        list->m_levels = {11, 22, 33, 44};
+        list->reorderLevel(33, 0);
+        if (list->m_levels != std::vector<int>{33, 11, 22, 44}) return false;
+        list->reorderLevel(44, -10);
+        if (list->m_levels != std::vector<int>{44, 33, 11, 22}) return false;
+        list->reorderLevel(33, 200);
+        if (list->m_levels != std::vector<int>{44, 11, 22, 33}) return false;
+        list->reorderLevel(22, 2);
+        list->reorderLevel(99, 0);
+        if (list->m_levels != std::vector<int>{44, 11, 22, 33}) return false;
+        list->reorderLevelStep(11, true);
+        if (list->m_levels != std::vector<int>{11, 44, 22, 33} ||
+            list->m_levelsString != "11,44,22,33") return false;
+        list->m_levels = {11};
+        list->reorderLevel(11, 200);
+        if (list->m_levels != std::vector<int>{11} || list->m_levelsString != "11") return false;
+        list->m_levels.clear();
+        list->reorderLevel(11, 0);
+        return list->m_levels.empty() && list->m_levelsString.empty();
+    });
+
+    runBindingTest("Native level list parsing", [] {
+        auto list = GJLevelList::create();
+        if (!list) return false;
+        list->parseListLevels("11,22,33");
+        if (list->m_levels != std::vector<int>{11, 22, 33} ||
+            list->m_levelsString != "11,22,33") return false;
+        std::string longList = "717171,717172,717173,717174,717175";
+        list->parseListLevels(longList);
+        if (list->m_levels != std::vector<int>{717171, 717172, 717173, 717174, 717175} ||
+            list->m_levelsString != longList) return false;
+        list->parseListLevels("11,11,0,-3");
+        if (list->m_levels != std::vector<int>{11, 11, 0, -3}) return false;
+        list->parseListLevels("");
+        return list->m_levels.empty() && list->m_levelsString.empty();
+    });
+
+    runBindingTest("Native paged reload dispatch", [] {
+        auto popup = std::make_unique<AlphaPagedReloadFixture>();
+        popup->m_mainLayer = CCLayer::create();
+        popup->addChild(popup->m_mainLayer);
+        auto bytes = reinterpret_cast<uint8_t*>(popup.get());
+        auto& page = *reinterpret_cast<int*>(bytes + 0x2a8);
+        auto& pending = *reinterpret_cast<int*>(bytes + 0x2ac);
+        PagedListPopup* base = popup.get();
+        base->loadPage(-1);
+        if (popup->requests || popup->clears) return false;
+        base->loadPage(5);
+        if (popup->requested != 5 || popup->requests != 1 || popup->clears != 1 ||
+            page != 5 || pending != -1 || !*reinterpret_cast<CCObject**>(bytes + 0x2b8)) {
+            return false;
+        }
+        // Replacing the loading indicator must release the previous native one.
+        base->showLoading();
+        return *reinterpret_cast<CCObject**>(bytes + 0x2b8) &&
+            geode::addresser::getVirtualOffset(&ReportQueuePopup::rebuildContent) == 0x420;
+    });
+
+    runBindingTest("Native popup virtual boundaries", [] {
+        return geode::addresser::getVirtualOffset(&AlphaMusicShape::boundary) == 0x438 &&
+            geode::addresser::getVirtualOffset(&AlphaNewgroundsShape::boundary) == 0x438;
+    });
+
+    runBindingTest("Native typed picker contracts", [] {
+        static_assert(std::is_abstract_v<FriendPickerDelegate>);
+        static_assert(std::is_abstract_v<IDNameBrowserDelegate>);
+        AlphaPickerFixture fixture;
+        FriendPickerDelegate* picker = &fixture;
+        IDNameBrowserDelegate* names = &fixture;
+        if (picker->selectedRecipientCount() || picker->selectedRecipients()) return false;
+        fixture.recipients = CCArray::create();
+        fixture.recipients->addObject(CCString::create("recipient"));
+        if (picker->selectedRecipientCount() != 1 ||
+            picker->selectedRecipients() != fixture.recipients || picker->pickerRowState(7) != 0 ||
+            picker->pickerCountBase() != 0) return false;
+        picker->clearRecipients();
+        names->idNameBrowserClosed(nullptr, 717171);
+        return picker->selectedRecipientCount() == 0 && fixture.selectedID == 717171;
     });
 }
 #ifdef __clang__

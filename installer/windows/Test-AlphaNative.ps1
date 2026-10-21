@@ -93,7 +93,12 @@ $expected = @(
     'Native typed SFX delegate callbacks',
     'Native tab and browser layouts',
     'Native tab and browser construction boundaries',
-    'Native game settings tabs'
+    'Native game settings tabs',
+    'Native level list reordering',
+    'Native level list parsing',
+    'Native paged reload dispatch',
+    'Native popup virtual boundaries',
+    'Native typed picker contracts'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {

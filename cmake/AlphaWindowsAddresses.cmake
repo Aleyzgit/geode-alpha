@@ -809,6 +809,62 @@ if (WIN32)
     alpha_patch_deleting_destructor(GameSettingsLayer 0x2c2530)
 endif()
 
+# Native list-row actions call the reorder function directly; coder loading
+# calls the parser at 0x2728a0, not the unrelated old shader address.
+alpha_patch_address(GeometryDash GJLevelList
+    "void reorderLevel(int levelID, int newPosition)" 0x272d00)
+alpha_patch_address(GeometryDash GJLevelList
+    "void parseListLevels(std::string str)" 0x2728a0 0x5225c0)
+# ReportQueuePopup's primary slot 0x420 reloads its current page through the
+# common paged dispatch path, which invokes requestPage and clearPageContent.
+alpha_patch_address(GeometryDash ReportQueuePopup "virtual void rebuildContent()" 0xc95b0)
+if (WIN32)
+    alpha_patch_class(GeometryDash PagedListPopup
+        "    TodoReturn loadPage(int);" "    void loadPage(int page) = win 0xc3610;")
+    alpha_patch_class(GeometryDash PagedListPopup
+        "    TodoReturn showLoading();" "    void showLoading() = win 0xc3770;")
+    alpha_patch_class(GeometryDash PagedListPopup
+        "virtual TodoReturn clearPageContent()" "virtual void clearPageContent()")
+    foreach(class IN ITEMS AccountReviewPopup AutoBackupPopup)
+        alpha_patch_class(GeometryDash "${class}"
+            "virtual TodoReturn clearPageContent()" "virtual void clearPageContent()")
+    endforeach()
+
+    # These callbacks have no native Windows vtable slot: each primary table
+    # ends at 0x430, and neither class has the corresponding delegate base.
+    alpha_patch_class(GeometryDash NewgroundsInfoLayer
+        "    virtual void FLAlert_Clicked(FLAlertLayer* layer, bool btn2) = win 0x9999999, imac"
+        "    [[missing(win)]]\n    virtual void FLAlert_Clicked(FLAlertLayer* layer, bool btn2) = imac")
+    alpha_patch_class(GeometryDash MusicBrowser
+        "    virtual void setTextPopupClosed(SetTextPopup* popup, std::string text) = win 0x9999999;"
+        "    [[missing(win)]]\n    virtual void setTextPopupClosed(SetTextPopup* popup, std::string text);")
+
+    # Concrete native pickers return a CCArray pointer and its unsigned count.
+    # Require SDK users to supply these interface callbacks, rather than
+    # advertising a native implementation at an unresolved address.
+    alpha_patch_class(GeometryDash FriendPickerDelegate
+        "    virtual TodoReturn selectedRecipientCount() = win 0x9999999;"
+        "    inline virtual unsigned int selectedRecipientCount() = 0;")
+    alpha_patch_class(GeometryDash FriendPickerDelegate
+        "    virtual TodoReturn selectedRecipients() = win 0x9999999;"
+        "    inline virtual cocos2d::CCArray* selectedRecipients() = 0;")
+    foreach(class IN ITEMS MemberListPopup MessageThreadsPage NewThreadPopup)
+        alpha_patch_class(GeometryDash "${class}"
+            "virtual TodoReturn selectedRecipientCount()" "virtual unsigned int selectedRecipientCount()")
+        alpha_patch_class(GeometryDash "${class}"
+            "virtual TodoReturn selectedRecipients()" "virtual cocos2d::CCArray* selectedRecipients()")
+    endforeach()
+    foreach(class IN ITEMS FriendPickerDelegate MemberListPopup)
+        alpha_patch_class(GeometryDash "${class}"
+            "virtual TodoReturn pickerRowState(int)" "virtual int pickerRowState(int)")
+        alpha_patch_class(GeometryDash "${class}"
+            "virtual TodoReturn pickerCountBase()" "virtual int pickerCountBase()")
+    endforeach()
+    alpha_patch_class(GeometryDash IDNameBrowserDelegate
+        "    virtual void idNameBrowserClosed(IDNameBrowserPopup*, int) = win 0x9999999;"
+        "    inline virtual void idNameBrowserClosed(IDNameBrowserPopup*, int) = 0;")
+endif()
+
 # GJRequestCell's native init is 0x158d20 (primary vtable 0x73cef0).
 # Its allocation is 0x248: score at 0x230, toggler at 0x238 and the
 # request-status-four flag at 0x240. The old popup callbacks have no native

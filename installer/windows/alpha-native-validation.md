@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 60 Windows address placeholders are in
+respective modules. The remaining 53 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `26cd9ca` and the bindings revision is
 `d6f3312f0886b2c285fd0d2593ebabdc03b6ca0c`. The generated Windows build has
-5,461 populated native wrappers, all pointing into executable sections of
+5,465 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The updated upstream declarations include the current gameplay-layer state
@@ -40,7 +40,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-86 checks cover native constructors, level/list cache fixtures, fresh/expired
+91 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -124,6 +124,29 @@ exercise SDK-derived tab/browser construction and destruction boundaries, plus
 native game-settings creation, tab selection and dropdown delegate dispatch.
 Generated state-header dependencies are included explicitly so that changing
 unity source order does not conceal missing map, array or cocos type includes.
+
+GJLevelList::reorderLevel uses 0x272d00, also called by native list-row actions;
+tests cover moves in both directions, clamped positions, absent IDs, one-item
+and empty lists, and the serialized level order. parseListLevels uses 0x2728a0,
+as called by native coder loading, replacing an unrelated shader address.
+Parsing tests cover short/long strings, replacement, duplicates and empty input.
+
+PagedListPopup::loadPage (0xc3610) invokes requestPage and clearPageContent;
+showLoading (0xc3770) replaces the owned indicator. Fixtures verify negative-page
+rejection, successful dispatch, page state and repeated indicator replacement.
+ReportQueuePopup::rebuildContent uses the native slot 0x420 at 0xc95b0. The full
+report-queue UI and server requests are not exercised by this fixture.
+
+FriendPickerDelegate now requires unsigned recipient counts and CCArray pointers;
+all three mapped concrete native implementations use those signatures. Its
+picker-state defaults return zero. IDNameBrowserDelegate likewise requires its
+receiver callback. These are abstract SDK contracts, not invented native base
+addresses. Typed fixture receivers verify dispatch and selection data. The
+obsolete NewgroundsInfoLayer alert callback and MusicBrowser text-popup callback
+are marked missing on Windows: neither has a native slot beyond 0x430 or the
+corresponding delegate base. A boundary fixture verifies SDK-derived virtual
+methods start at 0x438. These interface changes account for five of the seven
+removed address placeholders; they do not port mods relying on removed APIs.
 
 Additional fixtures exercise achievement/download lookups, username and ID
 caches, coin/completion namespaces, color interpolation, hue matrices, animation
