@@ -18,6 +18,9 @@
 #include <Geode/binding/EditorWindowPopup.hpp>
 #include <Geode/binding/EnterEffectObject.hpp>
 #include <Geode/binding/FMODAudioEngine.hpp>
+#include <Geode/binding/FMODMusic.hpp>
+#include <Geode/binding/FMODQueuedMusic.hpp>
+#include <Geode/binding/FMODSoundState.hpp>
 #include <Geode/binding/FriendPickerDelegate.hpp>
 #include <Geode/binding/FindObjectPopup.hpp>
 #include <Geode/binding/IDNameBrowserDelegate.hpp>
@@ -441,6 +444,52 @@ namespace {
             counts->valueForKey("alpha-sentinel")->intValue() != 44 || counts->count() != 3) return false;
         counts->setObject(CCString::create("invalid"), "page_3");
         return popup->countForPage(3) == 0 && counts->count() == 3;
+    }
+
+    template <class F>
+    bool withNativeMusicChannels(F test) {
+        auto engine = FMODAudioEngine::sharedEngine();
+        AlphaTestField music(engine->m_fmodMusic, std::unordered_map<int, FMODMusic>{});
+        AlphaTestField channels(engine->m_channelIDToChannel, std::unordered_map<int, FMOD::Channel*>{});
+        AlphaTestField state(engine->m_audioState, FMODAudioState{});
+        AlphaTestField removed(engine->m_removedSounds, std::vector<FMOD::Sound*>{});
+        AlphaTestField result(engine->m_lastResult, engine->m_lastResult);
+        std::vector<short> pcm(44100 * 3, 0);
+        FMOD_CREATESOUNDEXINFO info{};
+        info.cbsize = sizeof(info);
+        info.length = pcm.size() * sizeof(short);
+        info.numchannels = 1;
+        info.defaultfrequency = 44100;
+        info.format = FMOD_SOUND_FORMAT_PCM16;
+        FMOD::Sound* rawSound = nullptr;
+        if (!engine->m_system || engine->m_system->createSound(reinterpret_cast<char const*>(pcm.data()),
+            FMOD_OPENMEMORY | FMOD_OPENRAW, &info, &rawSound) != FMOD_OK || !rawSound) return false;
+        auto release = [](FMOD::Sound* value) { value->release(); };
+        std::unique_ptr<FMOD::Sound, decltype(release)> sound(rawSound, release);
+        auto stop = [](FMOD::Channel* value) { value->stop(); };
+        std::unique_ptr<FMOD::Channel, decltype(stop)> first(nullptr, stop);
+        std::unique_ptr<FMOD::Channel, decltype(stop)> second(nullptr, stop);
+        for (int index = 0; index < 2; ++index) {
+            FMOD::Channel* channel = nullptr;
+            if (engine->m_system->playSound(sound.get(), engine->m_backgroundMusicChannel, true, &channel) != FMOD_OK ||
+                !channel) return false;
+            (index == 0 ? first : second).reset(channel);
+            if (channel->setVolume(0.f) != FMOD_OK) return false;
+            auto id = 717171 + index;
+            auto channelID = 818181 + index;
+            FMODMusic entry{};
+            entry.m_channelID = channelID;
+            entry.m_sound = sound.get();
+            entry.m_filePath = std::string(128, char('a' + index));
+            engine->m_fmodMusic.emplace(id, entry);
+            engine->m_channelIDToChannel.emplace(channelID, channel);
+            auto& channelState = engine->m_audioState.m_soundStateForChannels[channelID];
+            channelState.m_musicID = id;
+            channelState.m_channelID = channelID;
+            channelState.m_isMusic = true;
+            engine->m_audioState.m_volumeForMusicChannels[id] = index == 0 ? .25f : .75f;
+        }
+        return test(engine, first.get(), second.get());
     }
 
     template <class Layer>
@@ -1860,6 +1909,62 @@ $on_game(Loaded) {
         return !manager->m_activeDownloads && !manager->m_musicObjects &&
             manager->m_customContentURL.empty() && manager->m_musicTags.empty() &&
             manager->m_resourceSfxUnorderedSet.empty() && manager->m_resourceSongUnorderedSet.empty();
+    });
+
+    runBindingTest("Native queued music value ownership and playback", [] {
+        return withNativeMusicChannels([](FMODAudioEngine* engine, FMOD::Channel* first, FMOD::Channel* second) {
+            if (sizeof(FMODQueuedMusic) != 0x68 || offsetof(FMODQueuedMusic, m_stopMusic) != 0x44 ||
+                offsetof(FMODQueuedMusic, m_channelID) != 0x48) return false;
+            FMODQueuedMusic music{};
+            music.m_filePath = std::string(128, 'q');
+            music.m_musicID = 717171;
+            music.m_channelID = 717172;
+            engine->triggerQueuedMusic(music);
+            bool firstPaused = true;
+            bool secondPaused = false;
+            return first->getPaused(&firstPaused) == FMOD_OK && !firstPaused &&
+                second->getPaused(&secondPaused) == FMOD_OK && secondPaused &&
+                music.m_filePath == std::string(128, 'q') && music.m_musicID == 717171 &&
+                music.m_channelID == 717172 && !music.m_stopMusic;
+        });
+    });
+
+    runBindingTest("Native queued music stop and channel swap", [] {
+        return withNativeMusicChannels([](FMODAudioEngine* engine, FMOD::Channel* first, FMOD::Channel* second) {
+            FMODQueuedMusic music{};
+            music.m_filePath = std::string(128, 'q');
+            music.m_musicID = 717171;
+            music.m_channelID = 717172;
+            music.m_stopMusic = true;
+            engine->triggerQueuedMusic(music);
+            bool paused = true;
+            bool playing = true;
+            auto stopped = second->isPlaying(&playing);
+            return first->getPaused(&paused) == FMOD_OK && !paused &&
+                (stopped == FMOD_ERR_INVALID_HANDLE || (stopped == FMOD_OK && !playing)) &&
+                engine->m_fmodMusic.at(717172).m_channelID == 818181 &&
+                engine->m_audioState.m_soundStateForChannels.at(818181).m_musicID == 717172 &&
+                engine->m_audioState.m_soundStateForChannels.at(818182).m_musicID == 717171 &&
+                engine->m_audioState.m_volumeForMusicChannels.at(717172) == .25f &&
+                engine->m_audioState.m_volumeForMusicChannels.at(717171) == .75f &&
+                music.m_musicID == 717171 && music.m_filePath == std::string(128, 'q');
+        });
+    });
+
+    runBindingTest("Native music start and resume control", [] {
+        return withNativeMusicChannels([](FMODAudioEngine* engine, FMOD::Channel* first, FMOD::Channel* second) {
+            engine->startMusic(0, 0, 0, 0, false, 717171, true, false);
+            bool paused = false;
+            if (first->getPaused(&paused) != FMOD_OK || !paused) return false;
+            engine->startMusic(0, 0, 0, 0, false, 717171, false, true);
+            if (first->getPaused(&paused) != FMOD_OK || paused) return false;
+            engine->startMusic(0, 0, 0, 0, false, 717172, true);
+            if (second->getPaused(&paused) != FMOD_OK || !paused) return false;
+            engine->startMusic(0, 0, 0, 0, false, 717172, false);
+            if (second->getPaused(&paused) != FMOD_OK || paused) return false;
+            second->setPaused(true);
+            return second->getPaused(&paused) == FMOD_OK && paused;
+        });
     });
 
     runBindingTest("Native audio mixer restart", [] {

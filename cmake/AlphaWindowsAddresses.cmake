@@ -531,6 +531,23 @@ alpha_patch_address(GeometryDash GJEffectManager
 # channel group precedes m_lastResult, and native state starts at 0x290.
 alpha_patch_address(GeometryDash FMODAudioEngine
     "FMODAudioEngine()" 0x5bf90 0x114ba0)
+alpha_patch_address(GeometryDash FMODAudioEngine
+    "void triggerQueuedMusic(FMODQueuedMusic music)" 0x64620)
+# Queued music calls the seven-argument native start helper. The SDK's older
+# eight-argument declaration had no Windows implementation; its tail is unused.
+set(alpha_start_music_signature "void startMusic(int start, int end, int fadeIn, int fadeOut, bool loop, int musicID, bool noResume, bool dontReset)")
+alpha_patch_class(GeometryDash FMODAudioEngine
+    "${alpha_start_music_signature} = imac"
+    "${alpha_start_music_signature} = win inline, imac")
+alpha_patch_class(GeometryDash FMODAudioEngine "    ${alpha_start_music_signature}"
+    "    void startMusic(int start, int end, int fadeIn, int fadeOut, bool loop, int musicID, bool noResume) = win 0x63270;\n    ${alpha_start_music_signature}")
+file(APPEND "${alpha_bindings_output}/inline/FMODAudioEngine.cpp" [=[
+#ifdef GEODE_IS_WINDOWS
+void FMODAudioEngine::startMusic(int start, int end, int fadeIn, int fadeOut, bool loop, int musicID, bool noResume, bool) {
+    startMusic(start, end, fadeIn, fadeOut, loop, musicID, noResume);
+}
+#endif
+]=])
 alpha_patch_class(GeometryDash FMODAudioEngine
     "    FMOD_RESULT m_lastResult;"
     "    PAD = win 0x8;\n    FMOD_RESULT m_lastResult;")

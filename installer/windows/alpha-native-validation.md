@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 19 Windows address placeholders are in
+respective modules. The remaining 18 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,489 populated native wrappers, all pointing into executable sections of
+5,491 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -165,7 +165,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-147 checks cover native constructors, level/list cache fixtures, fresh/expired
+150 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -402,6 +402,16 @@ at 0x290, and its channel maps are at 0x668 and 0x730. The value-class
 FMODAudioState initializes its containers through normal C++ construction and
 zeros its timing fields, matching native 0x5bdc0 without constructing containers
 twice. Audio tests include lookup misses and channel/effect stopping.
+triggerQueuedMusic uses 0x64620, referenced by the native queue/update paths.
+FMODQueuedMusic is 0x68 bytes, with stop/channel fields at 0x44/0x48. Native
+music start at 0x63270 has seven arguments; the older eight-argument SDK
+declaration lacked a Windows implementation and now forwards without its
+unused tail. Tests use two real FMOD channels playing generated silent PCM,
+verify resume suppression and playback through both overloads, then exercise
+queued playback and stop/swap behavior. They check music/channel IDs, sound
+state and volume-map swaps, and ownership of a heap-backed by-value path.
+The fixtures stop/release their channels and sound and restore the original
+music, channel and audio-state maps before returning.
 
 The SDK SpriteAnimationManager constructor previously left m_animateDict
 uninitialized. A native create/destroy fixture reproduced a CCObject::release
