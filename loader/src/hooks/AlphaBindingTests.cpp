@@ -60,6 +60,7 @@
 #include <Geode/binding/LevelListLayer.hpp>
 #include <Geode/binding/LevelOptionsLayer.hpp>
 #include <Geode/binding/LevelOptionsLayer2.hpp>
+#include <Geode/binding/LoadingCircle.hpp>
 #include <Geode/binding/LevelSearchLayer.hpp>
 #include <Geode/binding/LevelSettingsObject.hpp>
 #include <Geode/binding/LevelTools.hpp>
@@ -80,6 +81,7 @@
 #include <Geode/binding/PulseEffectAction.hpp>
 #include <Geode/binding/PagedListPopup.hpp>
 #include <Geode/binding/PlayLayer.hpp>
+#include <Geode/binding/ProfilePage.hpp>
 #include <Geode/binding/ReportQueuePopup.hpp>
 #include <Geode/binding/SFXBrowser.hpp>
 #include <Geode/binding/ShaderLayer.hpp>
@@ -129,6 +131,24 @@ static_assert(std::is_abstract_v<CCKeyboardActionManager>);
 static_assert(std::is_abstract_v<EditorWindowPopup>);
 static_assert(std::is_abstract_v<ScrollViewPopup>);
 namespace {
+    class AlphaProfileFixture final : public ProfilePage {
+    public:
+        CCArray* comments = nullptr;
+        std::string commentsKey;
+        std::string infoKey;
+        std::string info;
+        int loaded = 0;
+        void loadCommentsFinished(CCArray* values, char const* key) override {
+            comments = values;
+            commentsKey = key;
+            ++loaded;
+        }
+        void setupPageInfo(std::string value, char const* key) override {
+            info = std::move(value);
+            infoKey = key;
+        }
+    };
+
     class AlphaTriggerToggleFixture final : public SetupTriggerPopup {
     public:
         std::vector<std::pair<int, bool>> updates;
@@ -2641,6 +2661,69 @@ $on_game(Loaded) {
             }
             return affectedByPortals;
         });
+    });
+
+    runBindingTest("SDK profile construction boundary", [] {
+        alignas(ProfilePage) std::array<uint8_t, sizeof(ProfilePage) + 32> storage;
+        storage.fill(0xa5);
+        auto page = new (storage.data()) ProfilePage;
+        auto valid = sizeof(ProfilePage) == 0x388 && offsetof(ProfilePage, m_page) == 0x364 &&
+            !page->m_score && !page->m_accountID && !page->m_ownProfile && page->m_profileKey.empty() &&
+            !page->m_somethingWentWrong && !page->m_usernameLabel && !page->m_list &&
+            !page->m_rightArrow && !page->m_leftArrow && !page->m_followBtn && !page->m_followHint &&
+            !page->m_unk && !page->m_buttons && !page->m_arrayWithUsernameLabel && !page->m_itemCount &&
+            !page->m_pageStartIdx && !page->m_pageEndIdx && !page->m_page && !page->m_circle &&
+            !page->m_popupDelegate && !page->m_refreshBtn && !page->m_unk2;
+        page->m_profileKey.assign(128, 'p');
+        page->~ProfilePage();
+        return valid && std::all_of(storage.begin() + sizeof(ProfilePage), storage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native profile cached page controls", [] {
+        auto manager = GameLevelManager::get();
+        AlphaTestField stored(manager->m_storedLevels, CCDictionary::create());
+        AlphaTestField info(manager->m_pageInfo, CCDictionary::create());
+        AlphaTestField timers(manager->m_timerDict, CCDictionary::create());
+        auto page = std::make_unique<AlphaProfileFixture>();
+        page->m_accountID = 717171;
+        page->m_page = 2;
+        page->m_circle = LoadingCircle::create();
+        auto button = [] { return CCMenuItemSpriteExtra::create(CCSprite::create(), nullptr, nullptr); };
+        page->m_leftArrow = button();
+        page->m_rightArrow = button();
+        page->m_refreshBtn = button();
+        if (!page->m_circle || !page->m_leftArrow || !page->m_rightArrow || !page->m_refreshBtn) return false;
+        page->addChild(page->m_circle);
+        page->addChild(page->m_leftArrow);
+        page->addChild(page->m_rightArrow);
+        page->addChild(page->m_refreshBtn);
+        auto now = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+        for (int index : {-1, 0, 1, 2, 3}) {
+            auto key = fmt::format("a_717171_{}", index);
+            manager->m_storedLevels->setObject(CCArray::create(), key);
+            manager->m_pageInfo->setObject(CCString::create(fmt::format("fixture-page-{}", index)), key);
+            manager->m_timerDict->setObject(CCString::create(fmt::format("{}", now)), key);
+        }
+        auto verify = [&](int index, int calls) {
+            auto key = fmt::format("a_717171_{}", index);
+            return page->m_page == index && page->loaded == calls && page->m_profileKey == key &&
+                page->commentsKey == key && page->infoKey == key &&
+                page->info == fmt::format("fixture-page-{}", index) &&
+                page->comments == manager->m_storedLevels->objectForKey(key) &&
+                page->m_leftArrow->isVisible() == (index > 0) && !page->m_refreshBtn->isVisible();
+        };
+        page->onNextPage(nullptr);
+        if (!verify(3, 1)) return false;
+        page->onPrevPage(nullptr);
+        if (!verify(2, 2)) return false;
+        page->m_page = 0;
+        page->onPrevPage(nullptr);
+        if (!verify(-1, 3)) return false;
+        page->onNextPage(nullptr);
+        if (!verify(0, 4)) return false;
+        page->onNextPage(nullptr);
+        return verify(1, 5);
     });
 
     runBindingTest("Native browser page and folder labels", [] {

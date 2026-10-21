@@ -91,6 +91,16 @@ foreach(class IN ITEMS MoreVideoOptionsLayer ParentalOptionsLayer)
 endforeach()
 alpha_patch_address(GeometryDash GameStatsManager "void trySelectActivePath()" 0x2da5f0)
 alpha_patch_address(GeometryDash LevelBrowserLayer "void updatePageLabel()" 0x3e6a20)
+# ProfilePage's native factory inlines initialization of its 0x388-byte object.
+# SDK default construction must also initialize pointers released by its dtor.
+alpha_patch_class(GeometryDash ProfilePage "    virtual ~ProfilePage()"
+    "    ProfilePage() = win inline;\n    virtual ~ProfilePage()")
+file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/ProfilePage.cpp" alpha_profile_constructor)
+file(APPEND "${alpha_bindings_output}/inline/ProfilePage.cpp" "\n${alpha_profile_constructor}")
+alpha_patch_address(GeometryDash ProfilePage
+    "void onNextPage(cocos2d::CCObject* sender)" 0x55a6d0)
+alpha_patch_address(GeometryDash ProfilePage
+    "void onPrevPage(cocos2d::CCObject* sender)" 0x55a6e0)
 # GameManager::recountUserStats inlines this 43-level set in Windows 2.2091.
 # Keep the SDK's owning return value instead of binding an interior address.
 alpha_patch_address(GeometryDash LevelTools "static std::unordered_set<int> getLevelList()" inline)

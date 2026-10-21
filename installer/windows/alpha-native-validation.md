@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 16 Windows address placeholders are in
+respective modules. The remaining 14 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,494 populated native wrappers, all pointing into executable sections of
+5,496 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -128,6 +128,14 @@ exported or reset by these checks.
 LevelBrowserLayer::updatePageLabel at 0x3e6a20 updates page text at 0x2a8 and
 folder text at 0x2b8 from its search object. Fixtures verify one-based pages,
 folder numbers, last-page-button visibility and missing optional controls.
+ProfilePage's 0x388-byte native factory inlines initialization of its fields.
+The SDK constructor now initializes them for ordinary default construction as
+well. A guarded fixture checks defaults and destroys a heap-backed profile key.
+Native next/previous page callbacks at 0x55a6d0/0x55a6e0 adjust the page at 0x364
+and tail-call loadPage. A derived fixture uses isolated comment, page-info and
+fresh-timer dictionaries and receives the real cached delegate callbacks. It
+checks page keys, array identity, both directions and signed page indices,
+without requesting profile data from a server.
 LevelTools::posForTimeInternal at 0x4676d0 has seven native arguments. The old
 eight-argument SDK overload forwards to it without the unused tail argument;
 the seven-argument overload provides the actual hook signature. Empty/null
@@ -173,7 +181,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-152 checks cover native constructors, level/list cache fixtures, fresh/expired
+154 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
