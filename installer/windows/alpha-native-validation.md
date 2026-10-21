@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 47 Windows address placeholders are in
+respective modules. The remaining 40 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `4457dd8` and the bindings revision is
 `9a9af08340e446a970d434502f84cc5de52251e5`. The generated Windows build has
-5,460 populated native wrappers, all pointing into executable sections of
+5,467 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The updated upstream declarations include the current gameplay-layer state
@@ -40,7 +40,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-108 checks cover native constructors, level/list cache fixtures, fresh/expired
+116 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -80,6 +80,32 @@ addSpecial, checks the last-object position and removes it again. Existing
 local-level arrays and manager fields are restored before saving. Library
 requests are suppressed in the fixture. These checks do not establish that
 every editor feature works.
+
+GameObject::commonSetup uses 0x28ae70; tests check color defaults, a fresh unique
+ID, reset scale and reuse of its existing base-color allocation. Native custom
+color-child creation at 0x2944e0 owns the sprite at 0x380 and detail-color state
+at 0x458. A fixture replaces a real sprite and verifies the old reference is
+released while the detail-color allocation is reused. shouldBlendColor uses
+0x28de70; reserved channels, default-channel fallback, base-color recursion and
+the suppressing flag are checked outside editor preview mode.
+
+EditorUI::canSelectObject uses 0x1c8500. In a fresh editor, isolated game-variable
+settings verify object-ID, group-ID and effective base/detail color filtering.
+The inspected SDK fields match the native unique ID at 0x39c, object ID at
+0x40c, base/detail colors at 0x450/0x458 and group storage at 0x490/0x498.
+These fixtures fail with the original unresolved wrappers and pass with the
+native bindings, rather than testing only that their addresses are executable.
+
+Native level deletion at 0x21c870 distinguishes editor levels from downloaded
+levels. Fixtures use temporary local arrays, online/daily dictionaries and all
+three death-data containers. They verify repeated deletion, selective cache
+removal, unrelated entries and preservation of completion metadata while the
+downloaded level string is discarded. No user level is passed to this test.
+GameManager::completedAchievement (0x278140) applies icon and both color unlock
+types from synthetic achievement definitions into a temporary settings dictionary.
+Tests cover long keys, repeated application and absent definitions. ItemInfoPopup's
+factory at 0x3841e0 allocates 0x2a8 and initializes actual cube, ship and color
+information popups. The seven repaired APIs remove seven address placeholders.
 
 EditorUI::getXMin uses 0x1bf270; its native Windows body does not use the
 integer argument. Tests verify that translating the object layer does not

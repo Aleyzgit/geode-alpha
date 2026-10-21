@@ -17,8 +17,10 @@
 #include <Geode/binding/FMODAudioEngine.hpp>
 #include <Geode/binding/FriendPickerDelegate.hpp>
 #include <Geode/binding/IDNameBrowserDelegate.hpp>
+#include <Geode/binding/ItemInfoPopup.hpp>
 #include <Geode/binding/GameLevelManager.hpp>
 #include <Geode/binding/GameManager.hpp>
+#include <Geode/binding/GameObject.hpp>
 #include <Geode/binding/GameSettingsLayer.hpp>
 #include <Geode/binding/GameStatsManager.hpp>
 #include <Geode/binding/GameToolbox.hpp>
@@ -32,6 +34,7 @@
 #include <Geode/binding/GJOptionsLayer.hpp>
 #include <Geode/binding/GJRequestCell.hpp>
 #include <Geode/binding/GJRewardItem.hpp>
+#include <Geode/binding/GJSpriteColor.hpp>
 #include <Geode/binding/GJUserScore.hpp>
 #include <Geode/binding/LocalLevelManager.hpp>
 #include <Geode/binding/KeybindSet.hpp>
@@ -387,6 +390,21 @@ namespace {
         AlphaTestField artistState(search->m_artistFilterObjects, artists);
         return test(search, songs, tags, artists);
     }
+
+    template <class F>
+    bool withLevelDeletion(F test) {
+        auto manager = GameLevelManager::get();
+        auto local = LocalLevelManager::get();
+        AlphaTestField levels(local->m_localLevels, CCArray::create());
+        AlphaTestField online(manager->m_onlineLevels, CCDictionary::create());
+        AlphaTestField daily(manager->m_dailyLevels, CCDictionary::create());
+        AlphaTestField deaths(manager->m_deathRelated1,
+            std::unordered_map<int, std::string>{{717171, "deleted"}, {717172, "preserved"}});
+        AlphaTestField related(manager->m_deathRelated2,
+            std::unordered_map<int, int>{{717171, 1}, {717172, 2}});
+        AlphaTestField data(manager->m_deathData, std::unordered_set<int>{717171, 717172});
+        return test(manager, local);
+    }
 }
 
 $on_game(Loaded) {
@@ -564,6 +582,114 @@ $on_game(Loaded) {
         manager->m_platformAchievements->setObject(value, "alpha-achievement");
         return manager->getAchievementsWithID("alpha-achievement") == value &&
             !manager->getAchievementsWithID("alpha-missing");
+    });
+
+    runBindingTest("Native achievement unlock application", [] {
+        auto manager = GameManager::get();
+        auto achievements = AchievementManager::sharedState();
+        AlphaTestField settings(manager->m_valueKeeper, CCDictionary::create());
+        AlphaTestField definitions(achievements->m_platformAchievements, CCDictionary::create());
+        struct Unlock {
+            char const* icon;
+            int id;
+            UnlockType type;
+            IconType iconType;
+        };
+        Unlock unlocks[] = {
+            {"icon_717171", 717171, UnlockType::Cube, IconType::Cube},
+            {"ship_717172", 717172, UnlockType::Ship, IconType::Ship},
+            {"color_7", 7, UnlockType::Col1, IconType::Cube},
+            {"color2_8", 8, UnlockType::Col2, IconType::Cube},
+        };
+        for (auto const& unlock : unlocks) {
+            std::string key = std::string(96, 'a') + unlock.icon;
+            auto definition = CCDictionary::create();
+            definition->setObject(CCString::create(unlock.icon), "icon");
+            achievements->m_platformAchievements->setObject(definition, key);
+            int id = 0;
+            auto type = static_cast<UnlockType>(0);
+            manager->getUnlockForAchievement(key, id, type);
+            if (id != unlock.id || type != unlock.type) return false;
+            manager->completedAchievement(key);
+            auto unlockedKey = type == UnlockType::Col1 || type == UnlockType::Col2 ?
+                manager->colorKey(id, type) : manager->iconKey(id, unlock.iconType);
+            if (manager->m_valueKeeper->valueForKey(unlockedKey)->intValue() != 1) return false;
+            auto count = manager->m_valueKeeper->count();
+            manager->completedAchievement(key);
+            if (manager->m_valueKeeper->count() != count) return false;
+        }
+        auto count = manager->m_valueKeeper->count();
+        manager->completedAchievement("alpha-missing-unlock");
+        return manager->m_valueKeeper->count() == count;
+    });
+
+    runBindingTest("Native item information factories", [] {
+        if (sizeof(ItemInfoPopup) != 0x2a8) return false;
+        for (auto type : {UnlockType::Cube, UnlockType::Ship, UnlockType::Col1}) {
+            auto popup = ItemInfoPopup::create(1, type);
+            if (!popup || popup->m_itemID != 1 || popup->m_unlockType != type ||
+                !popup->m_mainLayer || !popup->m_buttonMenu || !popup->getChildrenCount()) return false;
+        }
+        return true;
+    });
+
+    runBindingTest("Native local level deletion", [] {
+        return withLevelDeletion([](GameLevelManager* manager, LocalLevelManager* local) {
+            auto removed = GJGameLevel::create();
+            auto kept = GJGameLevel::create();
+            if (!removed || !kept) return false;
+            removed->m_levelID = 717171;
+            kept->m_levelID = 717172;
+            removed->m_levelType = kept->m_levelType = GJLevelType::Editor;
+            local->m_localLevels->addObject(removed);
+            local->m_localLevels->addObject(kept);
+            manager->deleteLevel(removed);
+            manager->deleteLevel(removed);
+            return local->m_localLevels->count() == 1 && local->m_localLevels->objectAtIndex(0) == kept &&
+                manager->m_deathData.size() == 2 && manager->m_deathRelated1.size() == 2 &&
+                manager->m_deathRelated2.size() == 2;
+        });
+    });
+
+    runBindingTest("Native cached level deletion", [] {
+        return withLevelDeletion([](GameLevelManager* manager, LocalLevelManager*) {
+            auto removed = GJGameLevel::create();
+            auto kept = GJGameLevel::create();
+            auto progress = GJGameLevel::create();
+            auto daily = GJGameLevel::create();
+            if (!removed || !kept || !progress || !daily) return false;
+            removed->m_levelID = 717171;
+            kept->m_levelID = 717172;
+            progress->m_levelID = 717173;
+            daily->m_levelID = 717174;
+            for (auto level : {removed, kept, progress, daily}) {
+                level->m_levelType = GJLevelType::Saved;
+                level->m_dailyID = 0;
+                level->m_normalPercent = 0;
+                level->m_practicePercent = 0;
+                level->m_levelString.assign(128, 'a');
+            }
+            progress->m_normalPercent = 25;
+            daily->m_dailyID = 12;
+            manager->m_onlineLevels->setObject(removed, "717171");
+            manager->m_onlineLevels->setObject(kept, "717172");
+            manager->m_onlineLevels->setObject(progress, "717173");
+            manager->m_dailyLevels->setObject(daily, "12");
+            manager->deleteLevel(removed);
+            if (manager->m_onlineLevels->objectForKey("717171") ||
+                manager->m_deathData.contains(717171) || manager->m_deathRelated1.contains(717171) ||
+                manager->m_deathRelated2.contains(717171)) return false;
+            manager->deleteLevel(progress);
+            if (manager->m_onlineLevels->objectForKey("717173") != progress ||
+                !progress->m_levelString.empty() || !progress->m_levelNotDownloaded ||
+                progress->m_normalPercent.value() != 25) return false;
+            manager->deleteLevel(daily);
+            manager->deleteLevel(removed);
+            return !manager->m_dailyLevels->objectForKey("12") &&
+                manager->m_onlineLevels->objectForKey("717172") == kept &&
+                kept->m_levelString.size() == 128 && manager->m_deathData.contains(717172) &&
+                manager->m_deathRelated1.at(717172) == "preserved" && manager->m_deathRelated2.at(717172) == 2;
+        });
     });
 
     runBindingTest("Native animation cache", [] {
@@ -1326,6 +1452,98 @@ $on_game(Loaded) {
             restored = restored && layer->getPosition() == shifted;
             layer->setPosition(before);
             return restored && std::isfinite(first) && std::abs(first - second) < .001f;
+        });
+    });
+
+    runBindingTest("Native object common initialization", [] {
+        auto object = GameObject::createWithFrame("GJ_infoIcon_001.png");
+        if (!object || !object->m_baseColor) return false;
+        auto color = object->m_baseColor;
+        auto previousID = object->m_uniqueID;
+        color->m_colorID = 23;
+        color->m_defaultColorID = 24;
+        object->setScaleX(2.f);
+        object->setScaleY(3.f);
+        object->commonSetup();
+        return object->m_baseColor == color && color->m_colorID == 0 &&
+            color->m_defaultColorID == 1004 && object->m_uniqueID != previousID &&
+            object->getScaleX() == 1.f && object->getScaleY() == 1.f;
+    });
+
+    runBindingTest("Native object custom color child", [] {
+        auto object = GameObject::createWithFrame("GJ_infoIcon_001.png");
+        if (!object) return false;
+        auto first = object->addCustomColorChild("GJ_infoIcon_001.png");
+        if (!first || object->m_colorSprite != first || !object->m_detailColor ||
+            object->m_detailColor->m_colorID != 0 || object->m_detailColor->m_defaultColorID != 1) return false;
+        Ref<CCSprite> kept(first);
+        auto references = first->retainCount();
+        auto color = object->m_detailColor;
+        auto second = object->addCustomColorChild("GJ_infoIcon_001.png");
+        return second && second != first && object->m_colorSprite == second &&
+            object->m_detailColor == color && first->retainCount() + 1 == references &&
+            second->getContentSize().width > 0 && second->getContentSize().height > 0;
+    });
+
+    runBindingTest("Native object reserved color blending", [] {
+        auto object = GameObject::createWithFrame("GJ_infoIcon_001.png");
+        if (!object || !object->m_baseColor) return false;
+        AlphaTestField editorState(object->m_editorEnabled, false);
+        AlphaTestField suppressed(object->m_unk353, false);
+        GJSpriteColor color;
+        if (object->shouldBlendColor(&color, true)) return false;
+        for (int id : {1005, 1006, 1007}) {
+            color.m_colorID = id;
+            if (!object->shouldBlendColor(&color, true) || !object->shouldBlendColor(&color, false)) return false;
+        }
+        color.m_colorID = 0;
+        color.m_defaultColorID = 1007;
+        if (!object->shouldBlendColor(&color, true)) return false;
+        color.m_defaultColorID = 1012;
+        object->m_baseColor->m_colorID = 1007;
+        if (object->shouldBlendColor(&color, true) || !object->shouldBlendColor(&color, false)) return false;
+        object->m_baseColor->m_colorID = 0;
+        object->m_baseColor->m_defaultColorID = 0;
+        if (object->shouldBlendColor(&color, false)) return false;
+        color.m_defaultColorID = 1007;
+        object->m_unk353 = true;
+        return !object->shouldBlendColor(&color, true);
+    });
+
+    runBindingTest("Native editor object selection filters", [] {
+        return withNativeEditor(false, [](LevelEditorLayer* editor) {
+            auto manager = GameManager::get();
+            AlphaTestField settings(manager->m_valueKeeper, CCDictionary::create());
+            auto object = editor->createObject(1, {30.f, 30.f}, true);
+            if (!object || !object->m_baseColor || !editor->m_editorUI->canSelectObject(object)) return false;
+            auto variables = manager->m_valueKeeper;
+            auto set = [variables](char const* key, int value) {
+                variables->setObject(CCString::createWithFormat("%i", value), key);
+            };
+            set("gv_0064", 1);
+            set("gv_0005", 3);
+            set("gv_0006", 2);
+            if (editor->m_editorUI->canSelectObject(object)) return false;
+            set("gv_0006", 1);
+            if (!editor->m_editorUI->canSelectObject(object)) return false;
+            set("gv_0064", 0);
+            set("gv_0133", 23);
+            if (editor->m_editorUI->canSelectObject(object)) return false;
+            object->addToGroup(23);
+            if (!editor->m_editorUI->canSelectObject(object)) return false;
+            set("gv_0133", 24);
+            if (editor->m_editorUI->canSelectObject(object)) return false;
+            set("gv_0133", 0);
+            set("gv_0139", 1007);
+            GJSpriteColor detail;
+            AlphaTestField detailState(object->m_detailColor, &detail);
+            object->m_baseColor->m_colorID = 0;
+            object->m_baseColor->m_defaultColorID = 1007;
+            if (!editor->m_editorUI->canSelectObject(object)) return false;
+            object->m_baseColor->m_defaultColorID = 1005;
+            if (editor->m_editorUI->canSelectObject(object)) return false;
+            detail.m_colorID = 1007;
+            return editor->m_editorUI->canSelectObject(object);
         });
     });
 

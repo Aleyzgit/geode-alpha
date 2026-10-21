@@ -44,6 +44,27 @@ function(alpha_patch_address file class signature address)
         "${signature} = win ${expected}" "${signature} = win ${address}")
 endfunction()
 
+# Native object setup and sprite creation call these shared implementations.
+# Editor selection uses object ID, group and effective color-channel filters.
+alpha_patch_address(GeometryDash GameObject "void commonSetup()" 0x28ae70)
+alpha_patch_address(GeometryDash GameObject
+    "cocos2d::CCSprite* addCustomColorChild(std::string frame)" 0x2944e0)
+alpha_patch_address(GeometryDash GameObject
+    "bool shouldBlendColor(GJSpriteColor* color, bool mainColor)" 0x28de70)
+alpha_patch_address(GeometryDash EditorUI
+    "bool canSelectObject(GameObject* object)" 0x1c8500)
+
+# Native alert callbacks use this level deletion routine. Local editor levels
+# are removed from their own array; downloaded levels retain earned progress.
+alpha_patch_address(GeometryDash GameLevelManager
+    "void deleteLevel(GJGameLevel* level)" 0x21c870)
+# GameManager::dataLoaded applies achievement unlocks through this dictionary
+# update. ItemInfoPopup's factory allocates 0x2a8 and calls its bound init.
+alpha_patch_address(GeometryDash GameManager
+    "void completedAchievement(std::string key)" 0x278140)
+alpha_patch_address(GeometryDash ItemInfoPopup
+    "static ItemInfoPopup* create(int id, UnlockType type)" 0x3841e0)
+
 # AppDelegate's primary table is 0x719f88; its CCSceneDelegate subobject is
 # at 0xd8 with table 0x719f78. These callbacks remain native Windows APIs.
 if (WIN32)
