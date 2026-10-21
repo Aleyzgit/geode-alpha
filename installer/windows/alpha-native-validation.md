@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 22 Windows address placeholders are in
+respective modules. The remaining 20 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,486 populated native wrappers, all pointing into executable sections of
+5,489 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -64,6 +64,23 @@ A fresh editor fixture checks ordinary and legacy option pages, reversible
 mini-mode toggling and the tag-13 spawn-group field at 0x1c4, including integer
 conversion and unrelated tags. All changed level settings belong to that
 disposable editor level.
+SetupTriggerPopup::onToggleTriggerValue uses 0x60f240, also referenced by its
+native toggle-control builder. A derived SDK fixture creates two controls,
+clicks them and checks their independent states and native virtual callbacks.
+It verifies that the text-delegate guard is enabled during updates and that
+both prior guard states are restored afterward.
+FindObjectPopup stores a 32-bit group ID at 0x480, not a boolean. Its SDK
+constructor now initializes the complete value. Windows inlines its native
+window setup in EditorUI; the SDK initializer reproduces those verified
+settings and calls initWindow with width 200, height 89 and window ID 3.
+The return types of both onFieldEnter declarations are void. Native search,
+step and options callbacks use 0x1809f0, 0x180aa0 and 0x180ad0. The SDK
+selection helper calls search with direction zero, and the object-ID mode
+helper toggles the same 0232 preference read by native search without changing
+the group ID. A guarded fixture tests integer values larger than one byte;
+a fresh editor fixture constructs the window and exercises selection and
+both step directions. Its preference dictionary is isolated. The scalar
+deleting destructor at 0x180260 receives explicit deletion flags zero.
 Native updateExtraGameLayers at 0x32b500 copies position and both scale axes.
 GJUINode::create now uses 0x673b50, whose native allocation is 0x188; the old
 0x66d6e0 address created an unrelated 0x160-byte node. The 0x674070 position
@@ -140,7 +157,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-143 checks cover native constructors, level/list cache fixtures, fresh/expired
+146 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore

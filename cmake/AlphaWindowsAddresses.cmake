@@ -643,6 +643,8 @@ alpha_patch_address(GeometryDash SetupTriggerPopup
     "cocos2d::CCArray* getPageContainer(int page)" 0x60b6f0)
 alpha_patch_address(GeometryDash SetupTriggerPopup
     "cocos2d::CCArray* getGroupContainer(int group)" 0x60b970)
+alpha_patch_address(GeometryDash SetupTriggerPopup
+    "void onToggleTriggerValue(cocos2d::CCObject* sender)" 0x60f240)
 # Parse the 'a'-separated numeric particle record. Native writes at 0..0x104
 # match ParticleStruct, and an empty input leaves the supplied struct unchanged.
 alpha_patch_address(GeometryDash GameToolbox
@@ -766,11 +768,34 @@ endif()
 # leaves onBuildWindowContent pure. Concrete editor popups provide the body.
 alpha_patch_address(GeometryDash EditorWindowPopup "EditorWindowPopup()" 0x123530)
 alpha_patch_class(GeometryDash EditorWindowPopup
+    "virtual TodoReturn onFieldEnter()" "virtual void onFieldEnter()")
+alpha_patch_class(GeometryDash EditorWindowPopup
     "    virtual void onBuildWindowContent() = win 0x9999999;"
     "    inline virtual void onBuildWindowContent() = 0;")
 alpha_patch_class(GeometryDash EditorWindowPopup
     "    TodoReturn touchRect();"
     "    TodoReturn touchRect();\n    PAD = win 0x98;")
+
+# EditorUI inlines the find window's initialization. Its final member is a
+# 32-bit group ID, updated by valueDidChange at 0x1809e0, not a boolean.
+alpha_patch_address(GeometryDash FindObjectPopup "bool init(EditorUI*)" inline)
+alpha_patch_class(GeometryDash FindObjectPopup
+    "    bool m_unknownBool;" "    int m_groupID;")
+alpha_patch_class(GeometryDash FindObjectPopup
+    "virtual TodoReturn onFieldEnter()" "virtual void onFieldEnter()")
+alpha_patch_class(GeometryDash FindObjectPopup
+    "    TodoReturn runFind(int);" "    void runFind(int direction) = win 0x1809f0;")
+alpha_patch_class(GeometryDash FindObjectPopup
+    "    void onFindStep(cocos2d::CCObject* sender);"
+    "    void onFindStep(cocos2d::CCObject* sender) = win 0x180aa0;")
+alpha_patch_class(GeometryDash FindObjectPopup
+    "    void onSelect(cocos2d::CCObject* sender);"
+    "    void onSelect(cocos2d::CCObject* sender) = win inline;")
+alpha_patch_class(GeometryDash FindObjectPopup
+    "    void onOptions(cocos2d::CCObject* sender);"
+    "    void onOptions(cocos2d::CCObject* sender) = win 0x180ad0;")
+file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/FindObjectPopup.cpp" alpha_find_window)
+file(WRITE "${alpha_bindings_output}/inline/FindObjectPopup.cpp" "${alpha_find_window}")
 
 # ScrollViewPopup's native base has one retained object at 0x298, a further
 # eight bytes of state, and a pure buildContent entry at vtable offset 0x438.
@@ -1061,6 +1086,7 @@ if (WIN32)
     alpha_patch_deleting_destructor(GameSettingsLayer 0x2c2530)
     alpha_patch_deleting_destructor(KeybindingsSettingsPopup 0x3d8e30 PRESERVE_INLINE)
     alpha_patch_deleting_destructor(GJMGLayer 0x386c60)
+    alpha_patch_deleting_destructor(FindObjectPopup 0x180260)
 endif()
 
 # Options factories allocate 0x78 and 0x300. The native row reads its count at

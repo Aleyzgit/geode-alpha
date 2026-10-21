@@ -19,6 +19,7 @@
 #include <Geode/binding/EnterEffectObject.hpp>
 #include <Geode/binding/FMODAudioEngine.hpp>
 #include <Geode/binding/FriendPickerDelegate.hpp>
+#include <Geode/binding/FindObjectPopup.hpp>
 #include <Geode/binding/IDNameBrowserDelegate.hpp>
 #include <Geode/binding/ItemInfoPopup.hpp>
 #include <Geode/binding/GameLevelManager.hpp>
@@ -125,6 +126,22 @@ static_assert(std::is_abstract_v<CCKeyboardActionManager>);
 static_assert(std::is_abstract_v<EditorWindowPopup>);
 static_assert(std::is_abstract_v<ScrollViewPopup>);
 namespace {
+    class AlphaTriggerToggleFixture final : public SetupTriggerPopup {
+    public:
+        std::vector<std::pair<int, bool>> updates;
+        std::vector<std::pair<int, float>> changes;
+        bool guarded = true;
+        void updateToggleItem(int tag, bool toggled) override {
+            guarded = guarded && m_disableTextDelegate;
+            updates.emplace_back(tag, toggled);
+            SetupTriggerPopup::updateToggleItem(tag, toggled);
+        }
+        void valueDidChange(int tag, float value) override {
+            guarded = guarded && m_disableTextDelegate;
+            changes.emplace_back(tag, value);
+        }
+    };
+
     class AlphaEventFixture final : public GJBaseGameLayer {
     public:
         struct Call {
@@ -721,6 +738,80 @@ $on_game(Loaded) {
         lifetime.reset();
         return std::all_of(storage.begin() + sizeof(GJShaderState), storage.end(),
             [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native trigger toggle controls and delegate guard", [] {
+        auto popup = std::make_unique<AlphaTriggerToggleFixture>();
+        if (!popup->init(nullptr, nullptr, 240.f, 120.f, 1, 0.f)) return false;
+        for (int property : {7171, 7172}) {
+            auto nodes = popup->createToggleValueControlAdvanced(property, "Alpha fixture", {120.f, 60.f},
+                false, 0, 0, 0.5f, 0.3f, 100.f, {0.f, 0.f});
+            if (!nodes || !nodes->count()) return false;
+        }
+        auto first = static_cast<CCMenuItemToggler*>(popup->m_valueToggles->objectForKey(7171));
+        auto second = static_cast<CCMenuItemToggler*>(popup->m_valueToggles->objectForKey(7172));
+        if (!first || !second || first->m_toggled || second->m_toggled) return false;
+        popup->updates.clear();
+        popup->changes.clear();
+        popup->guarded = true;
+        popup->m_disableTextDelegate = false;
+        first->activate();
+        if (!first->m_toggled || second->m_toggled || popup->m_disableTextDelegate ||
+            popup->updates != std::vector<std::pair<int, bool>>{{7171, true}} ||
+            popup->changes != std::vector<std::pair<int, float>>{{7171, 1.f}}) return false;
+        popup->m_disableTextDelegate = true;
+        first->activate();
+        second->activate();
+        return !first->m_toggled && second->m_toggled && popup->m_disableTextDelegate && popup->guarded &&
+            popup->updates == std::vector<std::pair<int, bool>>{{7171, true}, {7171, false}, {7172, true}} &&
+            popup->changes == std::vector<std::pair<int, float>>{{7171, 1.f}, {7171, 0.f}, {7172, 1.f}};
+    });
+
+    runBindingTest("Native find popup group value boundary", [] {
+        alignas(FindObjectPopup) std::array<uint8_t, sizeof(FindObjectPopup) + 32> storage;
+        storage.fill(0xa5);
+        auto popup = new (storage.data()) FindObjectPopup();
+        auto destroy = [](FindObjectPopup* value) { value->~FindObjectPopup(); };
+        std::unique_ptr<FindObjectPopup, decltype(destroy)> lifetime(popup, destroy);
+        auto& group = popup->m_groupID;
+        if (sizeof(FindObjectPopup) != 0x488 || offsetof(FindObjectPopup, m_groupID) != 0x480 || group != 0) return false;
+        popup->valueDidChange(51, 654321.f);
+        if (group != 654321) return false;
+        popup->valueDidChange(50, 7.f);
+        if (group != 654321) return false;
+        popup->valueDidChange(51, -23.75f);
+        if (group != -23) return false;
+        lifetime.reset();
+        return std::all_of(storage.begin() + sizeof(FindObjectPopup), storage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("SDK find popup native window initialization", [] {
+        return withNativeEditor(false, [](LevelEditorLayer* editor) {
+            AlphaTestField variables(GameManager::get()->m_valueKeeper, CCDictionary::create());
+            auto popup = std::make_unique<FindObjectPopup>();
+            if (!popup->init(editor->m_editorUI) || !popup->m_mainLayer || !popup->m_inputNodes ||
+                !popup->m_inputNodes->objectForKey(51)) return false;
+            auto bytes = reinterpret_cast<uint8_t*>(popup.get());
+            if (*reinterpret_cast<EditorUI**>(bytes + 0x3e8) != editor->m_editorUI ||
+                *reinterpret_cast<int*>(bytes + 0x470) != 3 ||
+                *reinterpret_cast<float*>(bytes + 0x410) != 200.f ||
+                *reinterpret_cast<int*>(bytes + 0x480) != 0) return false;
+            popup->valueDidChange(51, 4321.f);
+            if (popup->m_groupID != 4321 || GameManager::get()->getGameVariable("0232")) return false;
+            popup->onFindObjectID(nullptr);
+            if (popup->m_groupID != 4321 || !GameManager::get()->getGameVariable("0232")) return false;
+            popup->onFindObjectID(nullptr);
+            popup->runFind(0);
+            popup->onFieldEnter();
+            popup->onSelect(nullptr);
+            auto sender = CCString::create("");
+            for (int tag : {1, 2}) {
+                sender->setTag(tag);
+                popup->onFindStep(sender);
+            }
+            return popup->m_groupID == 4321 && !GameManager::get()->getGameVariable("0232");
+        });
     });
 
     runBindingTest("Native gameplay event dispatch and frame cache", [] {
