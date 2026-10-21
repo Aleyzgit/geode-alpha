@@ -64,7 +64,7 @@ The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
 The GJGameLevel layout and editor build statistics now use the newer upstream
 bindings, including corrected level-browser, slider and secret-level methods.
-**30 Windows native-address placeholders remain**
+**29 Windows native-address placeholders remain**
 in the pinned game declarations. The engine declarations have no remaining
 Windows placeholders. Additional unsafe or incorrect entries have been corrected,
 including PVR functions that previously pointed outside executable memory.
@@ -98,7 +98,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. The 129 native checks passed in both
+Windows validation used Clang 21.1.8. The 133 native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -156,7 +156,7 @@ have no corresponding slot; this does not restore those old APIs.
 The current upstream v6 changes are integrated through `fed6cfb`, including
 popup touch priority, particle draw cost and updated async dependencies. Fixtures verify balanced
 popup priority registration and SDK arithmetic-popup construction.
-A comparison against 548 upstream Windows size references still reports 135
+A comparison against 548 upstream Windows size references still reports 133
 differences to investigate; some reference sizes conflict with verified native
 construction. The class-layout port remains incomplete.
 The effect manager reserves its native 0x828 bytes, including new state before
@@ -191,7 +191,13 @@ Video/parental option constructors initialize their dictionary and button pointe
 guarded fixtures check initialization, release counts and allocation boundaries.
 Native active-path selection is tested with temporary unlock/progress data,
 including retaining unfinished paths and selecting the next eligible path.
-All 5,478 populated generated wrappers point into executable
+The keybinding page uses its current 0x4a0-byte layout, native construction,
+tabs and search controls. Six obsolete Windows page/dictionary helpers are
+excluded because the native page no longer contains that data. This removes
+one placeholder without restoring those old APIs. Keybinding settings now
+return typed entries and reserve their full native popup allocation; fixtures
+check actual test-button callbacks and guarded destruction.
+All 5,480 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its

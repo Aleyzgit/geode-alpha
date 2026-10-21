@@ -114,6 +114,154 @@ alpha_patch_address(GeometryDash GJBaseGameLayer
 alpha_patch_address(GeometryDash GJBaseGameLayer
     "void updateExtraGameLayers()" 0x32b500)
 
+# KeybindingsLayer stores settings, an input source and search controls after
+# the 0x430-byte tabbed base. The old page dictionaries are absent.
+alpha_patch_class(GeometryDash KeybindingsLayer
+    "class KeybindingsLayer : TabbedPopupLayer {"
+    "class KeybindingsLayer : TabbedPopupLayer {\n    KeybindingsLayer() = win 0x3d56d0;")
+set(alpha_keybindings_old_fields [=[    int m_page;
+    int m_keyCount;
+    int m_maxPage;
+    cocos2d::CCDictionary* m_values;
+    cocos2d::CCDictionary* m_variables;
+    CCMenuItemSpriteExtra* m_prevButton;
+    CCMenuItemSpriteExtra* m_nextButton;]=])
+set(alpha_keybindings_new_fields [=[    win {
+        GameSettingsLayer* m_settings;
+        KeybindSource* m_keybindSource;
+        bool m_ownsKeybindSource;
+        CCTextInputNode* m_searchInput;
+        cocos2d::extension::CCScale9Sprite* m_searchBackground;
+        CCMenuItemSpriteExtra* m_clearSearchButton;
+        cocos2d::CCLayer* m_scrollLayer;
+        cocos2d::CCMenu* m_scrollMenu;
+        bool m_dragging;
+        std::string m_searchQuery;
+        int m_searchTab;
+    }
+    android, imac, m1, ios {
+]=])
+alpha_patch_class(GeometryDash KeybindingsLayer "${alpha_keybindings_old_fields}"
+    "${alpha_keybindings_new_fields}${alpha_keybindings_old_fields}\n    }")
+foreach(signature IN ITEMS
+    "int countForPage(int page)"
+    "void incrementCountForPage(int page)"
+    "cocos2d::CCPoint nextPosition(int page)"
+    "cocos2d::CCArray* objectsForPage(int page)"
+    "void onInfo(cocos2d::CCObject* sender)"
+    "void onToggle(cocos2d::CCObject* sender)")
+    alpha_patch_class(GeometryDash KeybindingsLayer "    ${signature} = win "
+        "    [[missing(win)]]\n    ${signature} = win ")
+endforeach()
+alpha_patch_class(GeometryDash KeybindingsLayer
+    "int countForPage(int page) = win 0x9999999;" "int countForPage(int page);")
+foreach(signature IN ITEMS
+    "void incrementCountForPage(int page)"
+    "cocos2d::CCArray* objectsForPage(int page)"
+    "void onInfo(cocos2d::CCObject* sender)"
+    "void onToggle(cocos2d::CCObject* sender)")
+    alpha_patch_class(GeometryDash KeybindingsLayer "${signature} = win inline;" "${signature};")
+endforeach()
+alpha_patch_class(GeometryDash KeybindingsLayer
+    "cocos2d::CCPoint nextPosition(int page) = win inline, m1"
+    "cocos2d::CCPoint nextPosition(int page) = m1")
+# Keep SDK key-formatting helpers; exclude the obsolete Windows functions
+# that access page dictionaries no longer present in the native class.
+file(WRITE "${alpha_bindings_output}/inline/KeybindingsLayer.cpp" [=[#include <Geode/binding/KeybindingsLayer.hpp>
+
+#ifdef GEODE_IS_WINDOWS
+const char* KeybindingsLayer::infoKey(int index) {
+    return cocos2d::CCString::createWithFormat("info_%i", index)->getCString();
+}
+
+const char* KeybindingsLayer::layerKey(int page) {
+    return cocos2d::CCString::createWithFormat("layer_%i", page)->getCString();
+}
+
+const char* KeybindingsLayer::objectKey(int page) {
+    return cocos2d::CCString::createWithFormat("object_%i", page)->getCString();
+}
+
+const char* KeybindingsLayer::pageKey(int page) {
+    return cocos2d::CCString::createWithFormat("page_%i", page)->getCString();
+}
+#endif
+]=])
+
+# Native settings callbacks return a vector of 0x28-byte menu entries, not
+# void. A wrong return type omits the hidden result-buffer argument.
+foreach(class IN ITEMS KeybindingsLayer LevelBindingsLayer)
+    alpha_patch_class(GeometryDash "${class}"
+        "virtual void settingsEntries()" "virtual std::vector<KeybindSettingsEntry> settingsEntries()")
+endforeach()
+set(alpha_extras_path "${alpha_bindings_output}/Extras.bro")
+file(READ "${alpha_extras_path}" alpha_extras)
+set(alpha_entry_before "class KeybindSettingsEntry {}")
+string(FIND "${alpha_extras}" "${alpha_entry_before}" alpha_entry_match)
+if (alpha_entry_match LESS 0)
+    message(FATAL_ERROR "Unexpected KeybindSettingsEntry declaration")
+endif()
+string(REPLACE "${alpha_entry_before}" [=[[[depends(cocos2d::CCObject)]]
+class KeybindSettingsEntry {
+    char const* m_title;
+    char const* m_background;
+    cocos2d::CCObject* m_target;
+    cocos2d::SEL_MenuHandler m_callback;
+    bool m_closeAfterAction;
+}]=] alpha_extras "${alpha_extras}")
+file(CONFIGURE OUTPUT "${alpha_extras_path}" CONTENT "${alpha_extras}" @ONLY)
+alpha_patch_class(GeometryDash KeybindingsSettingsPopup
+    "class KeybindingsSettingsPopup : FLAlertLayer, FLAlertLayerProtocol {"
+    "class KeybindingsSettingsPopup : FLAlertLayer, FLAlertLayerProtocol {\n    KeybindingsSettingsPopup() = win inline;")
+alpha_patch_class(GeometryDash KeybindingsSettingsPopup
+    "static KeybindingsSettingsPopup* create(KeybindingsLayer*, std::vector<KeybindSettingsEntry> const&);"
+    "static KeybindingsSettingsPopup* create(KeybindingsLayer* layer, std::vector<KeybindSettingsEntry> const& entries) = win inline;")
+alpha_patch_class(GeometryDash KeybindingsSettingsPopup
+    "bool init(KeybindingsLayer*, std::vector<KeybindSettingsEntry> const&);"
+    "bool init(KeybindingsLayer* layer, std::vector<KeybindSettingsEntry> const& entries) = win 0x3d8e80;")
+alpha_patch_class(GeometryDash KeybindingsSettingsPopup
+    "void onEntry(cocos2d::CCObject* sender);"
+    "void onEntry(cocos2d::CCObject* sender) = win 0x3d93c0;")
+alpha_patch_class(GeometryDash KeybindingsSettingsPopup
+    "    void onReset(cocos2d::CCObject* sender);"
+    [=[    void onReset(cocos2d::CCObject* sender);
+
+    KeybindingsLayer* m_keybindingsLayer;
+    std::vector<KeybindSettingsEntry> m_entries;
+    int m_pendingAction;
+    std::string m_pendingData;
+    int m_pendingImportMode;]=])
+file(WRITE "${alpha_bindings_output}/inline/KeybindingsSettingsPopup.cpp" [=[#include <Geode/binding/KeybindingsSettingsPopup.hpp>
+
+#ifdef GEODE_IS_WINDOWS
+KeybindingsSettingsPopup::KeybindingsSettingsPopup() :
+    m_keybindingsLayer(nullptr), m_entries(), m_pendingAction(0), m_pendingData(), m_pendingImportMode(0) {}
+
+KeybindingsSettingsPopup* KeybindingsSettingsPopup::create(KeybindingsLayer* layer, std::vector<KeybindSettingsEntry> const& entries) {
+    auto popup = new KeybindingsSettingsPopup();
+    if (popup->init(layer, entries)) {
+        popup->autorelease();
+        return popup;
+    }
+    delete popup;
+    return nullptr;
+}
+#endif
+]=])
+set(alpha_geometry_path "${alpha_bindings_output}/GeometryDash.bro")
+file(READ "${alpha_geometry_path}" alpha_geometry)
+foreach(class IN ITEMS KeybindingsLayer KeybindingsSettingsPopup)
+    set(alpha_attribute_before "[[link(android)]]\nclass ${class} ")
+    string(FIND "${alpha_geometry}" "${alpha_attribute_before}" alpha_attribute_match)
+    if (alpha_attribute_match LESS 0)
+        message(FATAL_ERROR "Unexpected ${class} attributes")
+    endif()
+    string(REPLACE "${alpha_attribute_before}"
+        "[[link(android), depends(KeybindSettingsEntry)]]\nclass ${class} "
+        alpha_geometry "${alpha_geometry}")
+endforeach()
+file(CONFIGURE OUTPUT "${alpha_geometry_path}" CONTENT "${alpha_geometry}" @ONLY)
+
 # AppDelegate's primary table is 0x719f88; its CCSceneDelegate subobject is
 # at 0xd8 with table 0x719f78. These callbacks remain native Windows APIs.
 if (WIN32)
@@ -880,7 +1028,7 @@ if (WIN32)
             "~${class}() = win ${address}" "~${class}() = win inline")
         set(alpha_destructor_source "#include <Geode/binding/${class}.hpp>\n#include <Geode/modify/Traits.hpp>\n\n#ifdef GEODE_IS_WINDOWS\n${class}::~${class}() {\n    if (!geode::DestructorLock::isLocked(this)) {\n        using FunctionType = void(*)(${class}*, unsigned int);\n        reinterpret_cast<FunctionType>(geode::base::get() + ${address})(this, 0);\n        new (this) ${class}(geode::CutoffConstructor, sizeof(${class}));\n        geode::DestructorLock::addLock(this);\n    }\n}\n#endif\n")
         set(alpha_destructor_existing "")
-        if (EXISTS "${alpha_bindings_source}/inline/${class}.cpp")
+        if (EXISTS "${alpha_bindings_source}/inline/${class}.cpp" OR ARGV2 STREQUAL "PRESERVE_INLINE")
             file(READ "${alpha_bindings_output}/inline/${class}.cpp" alpha_destructor_existing)
         endif()
         file(WRITE "${alpha_bindings_output}/inline/${class}.cpp"
@@ -888,6 +1036,7 @@ if (WIN32)
     endfunction()
     alpha_patch_deleting_destructor(TabbedPopupLayer 0x19cd00)
     alpha_patch_deleting_destructor(GameSettingsLayer 0x2c2530)
+    alpha_patch_deleting_destructor(KeybindingsSettingsPopup 0x3d8e30 PRESERVE_INLINE)
 endif()
 
 # Options factories allocate 0x78 and 0x300. The native row reads its count at

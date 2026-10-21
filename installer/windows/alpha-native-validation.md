@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 30 Windows address placeholders are in
+respective modules. The remaining 29 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,478 populated native wrappers, all pointing into executable sections of
+5,480 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -64,6 +64,29 @@ of an unfinished selected path, replacement of completed paths, the 999/1000
 completion boundary and no remaining eligible path. All manager fields are
 restored before the private profile is saved.
 
+KeybindingsLayer is 0x4a0 bytes and uses its native constructor at 0x3d56d0.
+Its current settings pointer/source are at 0x430/0x438, the search input at
+0x448, scroll layer/menu at 0x460/0x468, query at 0x478 and search-tab index
+at 0x498. The former page integers and dictionaries are absent. Six old
+Windows helpers that would access those dictionaries are excluded; removing
+their countForPage placeholder does not restore that older interface.
+Fixtures check guarded SDK construction/destruction with a heap-backed query,
+native creation, tab selection, searching, clearing and rebuilding. Native
+search deliberately selects its dedicated search tab. Saved tab/query globals
+are restored and test scroll offsets are not persisted.
+
+KeybindSettingsEntry is 0x28 bytes: title/background pointers, callback target,
+an eight-byte menu selector and close-after-action flag. The native global and
+level keybinding methods return a vector of these entries; their old void
+declarations omitted the required result buffer. A fixture checks native and
+qualified SDK return paths for Export/Import/Reset metadata without invoking
+those actions. KeybindingsSettingsPopup reserves 0x2f0 bytes, with its entry
+vector at 0x2a8 and pending string at 0x2c8. Its native init/entry dispatch are
+0x3d8e80/0x3d93c0. The native destructor at 0x3d8e30 is called with deletion
+flags zero. A guarded fixture clicks two custom test entries, rejects invalid
+indices and frees a heap-backed pending string. No user bindings are imported,
+exported or reset by these checks.
+
 The updated upstream declarations include the current gameplay-layer state
 and additional editor-window functions. Removed Windows classes such as
 EditorOptionsLayer, GameOptionsLayer and GJWriteMessagePopup are marked missing.
@@ -83,7 +106,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-129 checks cover native constructors, level/list cache fixtures, fresh/expired
+133 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -218,7 +241,7 @@ pointer fields and paged-popup storage are used without duplicate padding.
 TabbedPopupLayer's Windows tail remains the verified 0x48 bytes.
 
 A separate compiled-size comparison covers all 548 upstream Windows references.
-It reports 135 differences requiring native verification; these are not a list
+It reports 133 differences requiring native verification; these are not a list
 of proven defects because some reference sizes are inconsistent with native
 construction. For example, GameManager's fields start before the reference's
 claimed GManager size. No automatic padding is applied from this comparison.

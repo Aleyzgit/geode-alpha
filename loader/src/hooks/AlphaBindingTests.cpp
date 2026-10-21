@@ -42,6 +42,9 @@
 #include <Geode/binding/GJUserScore.hpp>
 #include <Geode/binding/LocalLevelManager.hpp>
 #include <Geode/binding/KeybindSet.hpp>
+#include <Geode/binding/KeybindingsLayer.hpp>
+#include <Geode/binding/KeybindingsSettingsPopup.hpp>
+#include <Geode/binding/KeybindSettingsEntry.hpp>
 #include <Geode/binding/LevelUploadDelegate.hpp>
 #include <Geode/binding/LabelGameObject.hpp>
 #include <Geode/binding/LevelEditorLayer.hpp>
@@ -114,6 +117,16 @@ static_assert(std::is_abstract_v<CCKeyboardActionManager>);
 static_assert(std::is_abstract_v<EditorWindowPopup>);
 static_assert(std::is_abstract_v<ScrollViewPopup>);
 namespace {
+    class AlphaKeybindEntryReceiver final : public CCObject {
+    public:
+        unsigned calls = 0;
+        CCObject* lastSender = nullptr;
+        void onEntry(CCObject* sender) {
+            ++calls;
+            lastSender = sender;
+        }
+    };
+
     class AlphaOptionsReceiver final : public OptionsObjectDelegate {
     public:
         unsigned changes = 0;
@@ -2041,6 +2054,121 @@ $on_game(Loaded) {
         return checkConstructionBoundary<AlphaTabbedFixture>() &&
             checkConstructionBoundary<AlphaBrowserFixture>() &&
             checkConstructionBoundary<AlphaListFixture>();
+    });
+
+    runBindingTest("Native keybinding popup construction", [] {
+        if (sizeof(KeybindingsLayer) != 0x4a0) return false;
+        auto& savedTab = *reinterpret_cast<int*>(base::get() + 0x909798);
+        auto& savedQuery = *reinterpret_cast<std::string*>(base::get() + 0x8fe4a8);
+        AlphaTestField tab(savedTab, savedTab);
+        AlphaTestField query(savedQuery, savedQuery);
+        alignas(KeybindingsLayer) std::array<uint8_t, sizeof(KeybindingsLayer) + 32> storage;
+        storage.fill(0xa5);
+        auto popup = new (storage.data()) KeybindingsLayer();
+        auto bytes = reinterpret_cast<uint8_t*>(popup);
+        auto& search = *reinterpret_cast<std::string*>(bytes + 0x478);
+        auto initialized = !*reinterpret_cast<void**>(bytes + 0x430) &&
+            !*reinterpret_cast<void**>(bytes + 0x438) && !bytes[0x440] &&
+            !*reinterpret_cast<void**>(bytes + 0x448) &&
+            !*reinterpret_cast<void**>(bytes + 0x460) && search.empty() &&
+            *reinterpret_cast<int*>(bytes + 0x498) == -1;
+        search.assign(128, 'q');
+        popup->~KeybindingsLayer();
+        return initialized && std::all_of(storage.begin() + sizeof(KeybindingsLayer), storage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native keybinding tabs and search", [] {
+        if (sizeof(KeybindingsLayer) != 0x4a0) return false;
+        auto& savedTab = *reinterpret_cast<int*>(base::get() + 0x909798);
+        auto& savedQuery = *reinterpret_cast<std::string*>(base::get() + 0x8fe4a8);
+        AlphaTestField tab(savedTab, 0);
+        AlphaTestField query(savedQuery, std::string());
+        auto pool = CCPoolManager::sharedPoolManager();
+        pool->push();
+        auto pop = [](CCPoolManager* value) { value->pop(); };
+        std::unique_ptr<CCPoolManager, decltype(pop)> scope(pool, pop);
+        auto popup = KeybindingsLayer::create(nullptr);
+        if (!popup || !popup->getChildrenCount()) return false;
+        auto bytes = reinterpret_cast<uint8_t*>(popup);
+        auto cleanup = [](KeybindingsLayer* value) {
+            // Avoid persisting test scroll offsets; the child remains owned by its parent.
+            *reinterpret_cast<void**>(reinterpret_cast<uint8_t*>(value) + 0x460) = nullptr;
+            value->cleanup();
+        };
+        std::unique_ptr<KeybindingsLayer, decltype(cleanup)> cleanupScope(popup, cleanup);
+        auto input = *reinterpret_cast<CCTextInputNode**>(bytes + 0x448);
+        auto& search = *reinterpret_cast<std::string*>(bytes + 0x478);
+        if (!input || !*reinterpret_cast<void**>(bytes + 0x438)) return false;
+        popup->showTab(0);
+        if (*reinterpret_cast<int*>(bytes + 0x418) != 0) return false;
+        input->setString("alpha-no-match-717171");
+        popup->textChanged(input);
+        int searchTab = popup->m_searchTab;
+        if (search != "alpha-no-match-717171" || searchTab < 0 ||
+            *reinterpret_cast<int*>(bytes + 0x418) != searchTab) return false;
+        popup->onClearSearch(nullptr);
+        popup->textChanged(input);
+        if (!input->getString().empty() || !search.empty()) return false;
+        popup->rebuildContent();
+        return popup->getChildrenCount() > 0 && *reinterpret_cast<int*>(bytes + 0x418) == searchTab;
+    });
+
+    runBindingTest("Native typed keybinding settings entries", [] {
+        if (sizeof(KeybindSettingsEntry) != 0x28 || sizeof(SEL_MenuHandler) != 8) return false;
+        auto& savedTab = *reinterpret_cast<int*>(base::get() + 0x909798);
+        auto& savedQuery = *reinterpret_cast<std::string*>(base::get() + 0x8fe4a8);
+        AlphaTestField tab(savedTab, savedTab);
+        AlphaTestField query(savedQuery, savedQuery);
+        auto popup = std::make_unique<KeybindingsLayer>();
+        auto entries = popup->KeybindingsLayer::settingsEntries();
+        KeybindingsLayer* native = popup.get();
+        auto dispatched = native->settingsEntries();
+        if (entries.size() != 3 || dispatched.size() != 3) return false;
+        char const* titles[] = {"Export", "Import", "Reset"};
+        for (size_t i = 0; i < entries.size(); ++i) {
+            if (std::string(entries[i].m_title) != titles[i] || !entries[i].m_background ||
+                entries[i].m_target || !entries[i].m_callback || entries[i].m_closeAfterAction ||
+                entries[i].m_callback != dispatched[i].m_callback) return false;
+        }
+        return true;
+    });
+
+    runBindingTest("Native keybinding settings entry controls", [] {
+        if (sizeof(KeybindingsSettingsPopup) != 0x2f0 ||
+            offsetof(KeybindingsSettingsPopup, m_entries) != 0x2a8 ||
+            offsetof(KeybindingsSettingsPopup, m_pendingData) != 0x2c8) return false;
+        AlphaKeybindEntryReceiver receiver;
+        std::vector<KeybindSettingsEntry> entries {
+            {"Alpha first", "GJ_button_02.png", &receiver,
+                menu_selector(AlphaKeybindEntryReceiver::onEntry), false},
+            {"Alpha second", "GJ_button_01.png", &receiver,
+                menu_selector(AlphaKeybindEntryReceiver::onEntry), false}
+        };
+        alignas(KeybindingsSettingsPopup) std::array<uint8_t, sizeof(KeybindingsSettingsPopup) + 32> storage;
+        storage.fill(0xa5);
+        auto popup = new (storage.data()) KeybindingsSettingsPopup();
+        auto destroy = [](KeybindingsSettingsPopup* value) { value->~KeybindingsSettingsPopup(); };
+        std::unique_ptr<KeybindingsSettingsPopup, decltype(destroy)> lifetime(popup, destroy);
+        if (popup->m_keybindingsLayer || !popup->m_entries.empty() || !popup->m_pendingData.empty() ||
+            !popup->init(nullptr, entries) || popup->m_entries.size() != 2 || !popup->m_buttonMenu) return false;
+        auto first = typeinfo_cast<CCMenuItemSpriteExtra*>(popup->m_buttonMenu->getChildByTag(0));
+        auto second = typeinfo_cast<CCMenuItemSpriteExtra*>(popup->m_buttonMenu->getChildByTag(1));
+        if (!first || !second) return false;
+        first->activate();
+        if (receiver.calls != 1 || receiver.lastSender != first) return false;
+        auto invalid = CCNode::create();
+        invalid->setTag(-1);
+        popup->onEntry(invalid);
+        invalid->setTag(99);
+        popup->onEntry(invalid);
+        if (receiver.calls != 1) return false;
+        second->activate();
+        if (receiver.calls != 2 || receiver.lastSender != second) return false;
+        popup->m_pendingData.assign(128, 'x');
+        lifetime.reset();
+        return std::all_of(storage.begin() + sizeof(KeybindingsSettingsPopup), storage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
     });
 
     runBindingTest("Native game settings tabs", [] {
