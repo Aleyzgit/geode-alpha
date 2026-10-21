@@ -64,7 +64,7 @@ The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
 The GJGameLevel layout and editor build statistics now use the newer upstream
 bindings, including corrected level-browser, slider and secret-level methods.
-**14 Windows native-address placeholders remain**
+**13 Windows native-address placeholders remain**
 in the pinned game declarations. The engine declarations have no remaining
 Windows placeholders. Additional unsafe or incorrect entries have been corrected,
 including PVR functions that previously pointed outside executable memory.
@@ -98,7 +98,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. The 154 native checks passed in both
+Windows validation used Clang 21.1.8. The 157 native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -156,7 +156,7 @@ have no corresponding slot; this does not restore those old APIs.
 The current upstream v6 changes are integrated through `fed6cfb`, including
 popup touch priority, particle draw cost and updated async dependencies. Fixtures verify balanced
 popup priority registration and SDK arithmetic-popup construction.
-A comparison against 548 upstream Windows size references still reports 133
+A comparison against 548 upstream Windows size references still reports 132
 differences to investigate; some reference sizes conflict with verified native
 construction. The class-layout port remains incomplete.
 The effect manager reserves its native 0x828 bytes, including new state before
@@ -201,7 +201,11 @@ Browser page/folder labels use the native update routine. Timeline positions
 use the native seven-argument helper, with a forwarding overload for the older
 SDK call. Fixtures compare portal timelines with the native editor and cover
 empty lists, all start speeds and platformer behavior.
-All 5,482 populated generated wrappers point into executable
+PauseLayer reserves its native 0x2a0 bytes, including start-position selection,
+the time control and side-button sprites. Guarded construction and destruction
+check array ownership; fixtures exercise queued start positions and all three
+quest slots. The SDK quest badge follows the game's inlined setup behavior.
+All 5,496 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its

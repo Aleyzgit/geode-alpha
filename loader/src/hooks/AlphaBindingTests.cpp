@@ -7,6 +7,7 @@
 #include <Geode/binding/CCCounterLabel.hpp>
 #include <Geode/binding/CCMenuItemToggler.hpp>
 #include <Geode/binding/CCSpriteWithHue.hpp>
+#include <Geode/binding/ChallengesPage.hpp>
 #include <Geode/binding/ColorAction.hpp>
 #include <Geode/binding/ColorChannelSprite.hpp>
 #include <Geode/binding/CommentAdminDelegate.hpp>
@@ -32,6 +33,7 @@
 #include <Geode/binding/GameStatsManager.hpp>
 #include <Geode/binding/GameToolbox.hpp>
 #include <Geode/binding/GJEffectManager.hpp>
+#include <Geode/binding/GJChallengeItem.hpp>
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/binding/GJKeybindManager.hpp>
 #include <Geode/binding/GlobalKeybindSource.hpp>
@@ -77,6 +79,7 @@
 #include <Geode/binding/OptionsScrollLayer.hpp>
 #include <Geode/binding/ParentalGateLayer.hpp>
 #include <Geode/binding/ParentalOptionsLayer.hpp>
+#include <Geode/binding/PauseLayer.hpp>
 #include <Geode/binding/OBB2D.hpp>
 #include <Geode/binding/PulseEffectAction.hpp>
 #include <Geode/binding/PagedListPopup.hpp>
@@ -86,6 +89,7 @@
 #include <Geode/binding/SFXBrowser.hpp>
 #include <Geode/binding/ShaderLayer.hpp>
 #include <Geode/binding/SongInfoObject.hpp>
+#include <Geode/binding/StartPosObject.hpp>
 #include <Geode/binding/SpriteAnimationManager.hpp>
 #include <Geode/binding/ScrollViewPopup.hpp>
 #include <Geode/binding/SetTextPopup.hpp>
@@ -2661,6 +2665,84 @@ $on_game(Loaded) {
             }
             return affectedByPortals;
         });
+    });
+
+    runBindingTest("Native pause construction boundary and ownership", [] {
+        alignas(PauseLayer) std::array<uint8_t, sizeof(PauseLayer) + 32> storage;
+        storage.fill(0xa5);
+        auto popup = new (storage.data()) PauseLayer;
+        auto valid = sizeof(PauseLayer) == 0x2a0 && offsetof(PauseLayer, m_startPosObjects) == 0x260 &&
+            offsetof(PauseLayer, m_questsSprite) == 0x298 && !popup->m_unfocused && !popup->m_tryingQuit &&
+            !popup->m_uiHidden && !popup->m_startPosLabel && !popup->m_startPosIndex && !popup->m_startPosObjects &&
+            !popup->m_startPosChanged && !popup->m_timeSpeedControl && !popup->m_mainLayer &&
+            !popup->m_musicSlider && !popup->m_sfxSlider && !popup->m_hideMenu && !popup->m_questsSprite;
+        auto objects = CCArray::create();
+        objects->retain();
+        popup->m_startPosObjects = objects;
+        popup->~PauseLayer();
+        return valid && objects->retainCount() == 1 &&
+            std::all_of(storage.begin() + sizeof(PauseLayer), storage.end(), [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native pause queued start position lookup", [] {
+        auto popup = std::make_unique<PauseLayer>();
+        if (popup->getQueuedStartPos()) return false;
+        auto objects = CCArray::create();
+        popup->m_startPosObjects = objects;
+        objects->retain();
+        for (int i = 0; i < 2; ++i) {
+            auto object = typeinfo_cast<StartPosObject*>(GameObject::createWithKey(31));
+            if (!object) return false;
+            objects->addObject(object);
+        }
+        popup->m_startPosIndex = 1;
+        if (popup->getQueuedStartPos()) return false;
+        popup->m_startPosChanged = true;
+        for (int index : {-1, 0, 1, 2, 3}) {
+            popup->m_startPosIndex = index;
+            auto expected = index >= 1 && index <= 2 ? objects->objectAtIndex(index - 1) : nullptr;
+            if (popup->getQueuedStartPos() != expected) return false;
+        }
+        return true;
+    });
+
+    runBindingTest("Native quest availability and pause badge", [] {
+        auto stats = GameStatsManager::get();
+        AlphaTestField challenges(stats->m_activeChallenges, CCDictionary::create());
+        auto popup = std::make_unique<PauseLayer>();
+        if (offsetof(GJChallengeItem, m_canClaim) != 0x64) return false;
+        popup->checkQuestsStatus();
+        auto sprite = CCSprite::createWithSpriteFrameName("sideBtn_quests_001.png");
+        if (!sprite) return false;
+        popup->m_questsSprite = sprite;
+        popup->addChild(sprite);
+        auto unrelated = CCNode::create();
+        sprite->addChild(unrelated, 0, 7);
+        auto outside = GJChallengeItem::create();
+        if (!outside) return false;
+        outside->m_canClaim = true;
+        stats->storeChallenge(4, outside);
+        if (ChallengesPage::canCollectQuests()) return false;
+        popup->checkQuestsStatus();
+        if (sprite->getChildByTag(99)) return false;
+        for (int position = 1; position <= 3; ++position) {
+            auto item = GJChallengeItem::create();
+            if (!item) return false;
+            item->m_canClaim = true;
+            stats->storeChallenge(position, item);
+            if (!ChallengesPage::canCollectQuests()) return false;
+            for (int repeat = 0; repeat < 2; ++repeat) {
+                popup->checkQuestsStatus();
+                auto badge = sprite->getChildByTag(99);
+                if (!badge || badge->getZOrder() != 10 || badge->getScale() != .3f ||
+                    badge->getPosition() != CCPoint{6.f, 22.f} || sprite->getChildrenCount() != 2) return false;
+            }
+            item->m_canClaim = false;
+            if (ChallengesPage::canCollectQuests()) return false;
+            popup->checkQuestsStatus();
+            if (sprite->getChildByTag(99) || sprite->getChildByTag(7) != unrelated) return false;
+        }
+        return true;
     });
 
     runBindingTest("SDK profile construction boundary", [] {

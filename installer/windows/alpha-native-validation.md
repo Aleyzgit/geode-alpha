@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 14 Windows address placeholders are in
+respective modules. The remaining 13 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -136,6 +136,18 @@ and tail-call loadPage. A derived fixture uses isolated comment, page-info and
 fresh-timer dictionaries and receives the real cached delegate callbacks. It
 checks page keys, array identity, both directions and signed page indices,
 without requesting profile data from a server.
+PauseLayer reserves 0x2a0 bytes. Its start-position label/index/array/changed
+fields occupy 0x250/0x258/0x260/0x268; the time control, main layer, sliders,
+hide menu and quest sprite occupy 0x270 through 0x298. SDK construction
+initializes those fields. The scalar deleting destructor at 0x4d6600 receives
+explicit deletion flags zero. A guarded fixture checks native array release
+and allocation boundaries. The queued-start-position fixture checks its native
+one-based lookup at 0x4d8f90, including unchanged and out-of-range selection.
+ChallengesPage::canCollectQuests is a static boolean query at 0x9e380 for
+slots 1 through 3. PauseLayer's quest-status helper is inlined in native setup;
+the SDK recreates its badge with tag 99, Z order 10, scale 0.3 and position
+(6, 22). A fixture isolates challenges and verifies each slot, badge replacement,
+removal and preservation of unrelated children. No quest is collected.
 LevelTools::posForTimeInternal at 0x4676d0 has seven native arguments. The old
 eight-argument SDK overload forwards to it without the unused tail argument;
 the seven-argument overload provides the actual hook signature. Empty/null
@@ -181,7 +193,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-154 checks cover native constructors, level/list cache fixtures, fresh/expired
+157 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -316,7 +328,7 @@ pointer fields and paged-popup storage are used without duplicate padding.
 TabbedPopupLayer's Windows tail remains the verified 0x48 bytes.
 
 A separate compiled-size comparison covers all 548 upstream Windows references.
-It reports 133 differences requiring native verification; these are not a list
+It reports 132 differences requiring native verification; these are not a list
 of proven defects because some reference sizes are inconsistent with native
 construction. For example, GameManager's fields start before the reference's
 claimed GManager size. No automatic padding is applied from this comparison.

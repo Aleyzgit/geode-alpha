@@ -101,6 +101,25 @@ alpha_patch_address(GeometryDash ProfilePage
     "void onNextPage(cocos2d::CCObject* sender)" 0x55a6d0)
 alpha_patch_address(GeometryDash ProfilePage
     "void onPrevPage(cocos2d::CCObject* sender)" 0x55a6e0)
+
+# Gameplay's pause factory allocates 0x2a0 and initializes these fields after
+# the delegate bases. Its destructor retains ownership of the startpos array.
+alpha_patch_class(GeometryDash PauseLayer "    bool m_tryingQuit;"
+    "    bool m_tryingQuit;\n    bool m_uiHidden;\n    cocos2d::CCLabelBMFont* m_startPosLabel;\n    int m_startPosIndex;\n    cocos2d::CCArray* m_startPosObjects;\n    bool m_startPosChanged;\n    TimeSpeedControl* m_timeSpeedControl;\n    cocos2d::CCLayer* m_mainLayer;\n    Slider* m_musicSlider;\n    Slider* m_sfxSlider;\n    cocos2d::CCMenu* m_hideMenu;\n    cocos2d::CCSprite* m_questsSprite;")
+alpha_patch_class(GeometryDash PauseLayer "TodoReturn checkQuestsStatus()" "void checkQuestsStatus()")
+alpha_patch_address(GeometryDash PauseLayer "void checkQuestsStatus()" inline)
+alpha_patch_class(GeometryDash ChallengesPage "    TodoReturn canCollectQuests();"
+    "    static bool canCollectQuests() = win 0x9e380;")
+set(alpha_pause_inline "${alpha_bindings_output}/inline/PauseLayer.cpp")
+file(READ "${alpha_pause_inline}" alpha_pause_content)
+set(alpha_pause_old_constructor "PauseLayer::PauseLayer() {\n    m_unfocused = false;\n    m_tryingQuit = false;\n}")
+string(FIND "${alpha_pause_content}" "${alpha_pause_old_constructor}" alpha_pause_match)
+if (alpha_pause_match LESS 0)
+    message(FATAL_ERROR "Unexpected PauseLayer constructor implementation")
+endif()
+string(REPLACE "${alpha_pause_old_constructor}" "" alpha_pause_content "${alpha_pause_content}")
+file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/PauseLayer.cpp" alpha_pause_constructor)
+file(WRITE "${alpha_pause_inline}" "${alpha_pause_content}\n${alpha_pause_constructor}")
 # GameManager::recountUserStats inlines this 43-level set in Windows 2.2091.
 # Keep the SDK's owning return value instead of binding an interior address.
 alpha_patch_address(GeometryDash LevelTools "static std::unordered_set<int> getLevelList()" inline)
@@ -1133,6 +1152,7 @@ if (WIN32)
     alpha_patch_deleting_destructor(KeybindingsSettingsPopup 0x3d8e30 PRESERVE_INLINE)
     alpha_patch_deleting_destructor(GJMGLayer 0x386c60)
     alpha_patch_deleting_destructor(FindObjectPopup 0x180260)
+    alpha_patch_deleting_destructor(PauseLayer 0x4d6600)
 endif()
 
 # Options factories allocate 0x78 and 0x300. The native row reads its count at
