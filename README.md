@@ -84,7 +84,7 @@ convert old DLLs. Some mods need to be rebuilt or ported by their authors.
 Platform checks and package hash checks remain enabled.
 
 Build with Clang and the normal upstream CMake workflow. Bindings are pinned
-to `d6f3312f0886b2c285fd0d2593ebabdc03b6ca0c`; the fork's verified native
+to `9a9af08340e446a970d434502f84cc5de52251e5`; the fork's verified native
 address corrections are applied in the build directory. To reject a build
 while Windows placeholders remain, configure with
 `-DGEODE_ALPHA_REQUIRE_COMPLETE_BINDINGS=ON`. This check is expected to fail
@@ -98,7 +98,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. Ninety-one native checks passed in both
+Windows validation used Clang 21.1.8. Ninety-three native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -134,9 +134,11 @@ completion callbacks; tests cover editing, limits, display prefixes and delegate
 Counter fixtures cover increasing/decreasing animations and updates to an actual
 gameplay counter object, including value limits and its update lock.
 Save-manager, gameplay and SFX callbacks use the current native virtual order
-and typed return values. A local audit matched all 2,148 checked virtual methods
-across 461 classes to native RTTI tables after correcting 84 slot or base-offset
-disagreements. Tabbed settings and level browsers reserve their full native
+and typed return values. A local audit matched all 2,116 checked virtual methods
+across 461 classes to native RTTI tables. An earlier audit identified 84 slot
+or base-offset disagreements that are now corrected. Upstream removed several
+redundant or obsolete declarations from the audited set. Tabbed settings and
+level browsers reserve their full native
 allocations; fixtures cover construction/destruction boundaries and actual
 game-settings tab dispatch. This audit covers known mapped virtual methods,
 not every SDK interface or mod.
@@ -145,7 +147,13 @@ empty lists. Paged reloads dispatch through their native request/clear callbacks
 Picker interfaces now require typed recipient-array/count and ID-name receivers.
 Two obsolete Windows popup callbacks are excluded because their native vtables
 have no corresponding slot; this does not restore those old APIs.
-All 5,465 populated generated wrappers point into executable
+The current upstream v6 changes are integrated through `4457dd8`, including
+popup touch priority and updated async dependencies. Fixtures verify balanced
+popup priority registration and SDK arithmetic-popup construction.
+A comparison against 548 upstream Windows size references still reports 142
+differences to investigate; some reference sizes conflict with verified native
+construction. The class-layout port remains incomplete.
+All 5,446 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its

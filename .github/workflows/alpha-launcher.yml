@@ -4,10 +4,14 @@ on:
   push:
     paths:
       - 'installer/windows/*Alpha*.ps1'
+      - 'cmake/AlphaBindingAudit.cmake'
+      - 'cmake/tests/AlphaBindingAudit.cmake'
       - '.github/workflows/alpha-launcher.yml'
   pull_request:
     paths:
       - 'installer/windows/*Alpha*.ps1'
+      - 'cmake/AlphaBindingAudit.cmake'
+      - 'cmake/tests/AlphaBindingAudit.cmake'
       - '.github/workflows/alpha-launcher.yml'
 
 jobs:
@@ -15,6 +19,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Native binding audit fixtures
+        run: cmake -P cmake/tests/AlphaBindingAudit.cmake
       - name: Windows PowerShell 5.1
         shell: powershell
         run: |

@@ -86,8 +86,7 @@ bool Popup::init(
     float width, float height, char const* bg, CCRect bgRect
 ) {
     m_size = CCSize{ width, height };
-    // Own a modal touch level, matching the 2.2091 alert layers.
-    CCTouchDispatcher::get()->registerForcePrio(this, 2, 1);
+    CCTouchDispatcher::get()->registerForcePrio(this, 2, 0);
 
     if (!this->initWithColor({ 0, 0, 0, 105 })) return false;
 

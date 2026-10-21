@@ -65,6 +65,7 @@
 #include <Geode/cocos/particle_nodes/CCParticleSystemQuad.h>
 #include <Geode/cocos/CCScheduler.h>
 #include <Geode/cocos/cocoa/CCAutoreleasePool.h>
+#include <Geode/ui/Popup.hpp>
 #include <Geode/loader/GameEvent.hpp>
 #include <Geode/loader/Loader.hpp>
 #include <Geode/utils/addresser.hpp>
@@ -95,6 +96,12 @@ static_assert(std::is_abstract_v<CCKeyboardActionManager>);
 static_assert(std::is_abstract_v<EditorWindowPopup>);
 static_assert(std::is_abstract_v<ScrollViewPopup>);
 namespace {
+    class AlphaModalFixture final : public geode::Popup {
+    public:
+        bool initialize() { return Popup::init(120.f, 80.f); }
+        ~AlphaModalFixture() override = default;
+    };
+
     class AlphaMusicShape final : public MusicBrowser {
     public:
         virtual void boundary() {}
@@ -509,13 +516,13 @@ $on_game(Loaded) {
         AlphaTestField names(manager->m_knownUsers, CCDictionary::create());
         AlphaTestField accounts(manager->m_accountIDtoUserIDDict, CCDictionary::create());
         AlphaTestField users(manager->m_userIDtoAccountIDDict, CCDictionary::create());
-        AlphaTestField accountNames(manager->m_usernameForAccountID,
+        AlphaTestField accountNames(manager->m_accountIdToUsernameMap,
             std::unordered_map<int, std::string>{});
         AlphaTestField downloads(manager->m_downloadObjects, CCDictionary::create());
         manager->storeUserName(717171, 818181, "Alpha Native Fixture");
         auto valid = std::string(manager->m_knownUsers->valueForKey("717171")->getCString()) ==
                 "Alpha Native Fixture" &&
-            manager->m_usernameForAccountID.at(818181) == "Alpha Native Fixture" &&
+            manager->m_accountIdToUsernameMap.at(818181) == "Alpha Native Fixture" &&
             manager->m_accountIDtoUserIDDict->valueForKey(818181)->intValue() == 717171 &&
             manager->m_userIDtoAccountIDDict->valueForKey(717171)->intValue() == 818181;
         manager->m_downloadObjects->setObject(CCString::create("fixture"), "alpha-download");
@@ -705,7 +712,7 @@ $on_game(Loaded) {
         AlphaDelegateFields delegates(manager);
         AlphaTestField requests(manager->m_friendReqAndUserBlocks, CCDictionary::create());
         AlphaAdminFixture callback;
-        manager->m_commentAdminDelegate = &callback;
+        manager->m_adminDelegate = &callback;
         manager->handleIt(true, "1", "alpha-queue", GJHttpType::AdminQueueMute);
         manager->handleIt(false, "", "alpha-queue", GJHttpType::AdminQueueMute);
         manager->handleIt(true, "1", "alpha-queue", GJHttpType::AdminQueueUnmute);
@@ -1374,6 +1381,25 @@ $on_game(Loaded) {
         picker->clearRecipients();
         names->idNameBrowserClosed(nullptr, 717171);
         return picker->selectedRecipientCount() == 0 && fixture.selectedID == 717171;
+    });
+
+    runBindingTest("Native popup touch priority lifetime", [] {
+        auto dispatcher = CCTouchDispatcher::get();
+        auto target = dispatcher->getTargetPrio();
+        bool valid = false;
+        {
+            auto popup = std::make_unique<AlphaModalFixture>();
+            if (!popup->initialize()) return false;
+            int level = 0;
+            valid = dispatcher->getTargetPrio() == target - 2 &&
+                !dispatcher->ownerLevelOf(popup.get(), level);
+        }
+        return valid && dispatcher->getTargetPrio() == target;
+    });
+
+    runBindingTest("Native arithmetic gate SDK construction", [] {
+        return sizeof(ParentalGateLayer) == 0x308 &&
+            checkConstructionBoundary<ParentalGateLayer>();
     });
 }
 #ifdef __clang__

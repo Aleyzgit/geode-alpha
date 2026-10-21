@@ -105,39 +105,37 @@ alpha_patch_address(GeometryDash GJRobotSprite
     "static GJRobotSprite* create(int frame)" 0x3ac740 0x185e70)
 
 # GameLevelManager's native constructor is 0x217310, allocation size 0x690.
-# Preserve unknown storage, including the new containers before m_queuedLists.
-# Confirmed with the constructor and the GLM_* dictionary serialization keys.
+# Upstream now declares its new containers and state. Retain typed delegates
+# at the native offsets verified through the GLM HTTP dispatch table.
 alpha_patch_class(GeometryDash GameLevelManager
     "    virtual ~GameLevelManager()"
     "    GameLevelManager() = win 0x217310;\n    virtual ~GameLevelManager()")
-alpha_patch_class(GeometryDash GameLevelManager
-    "    std::set<std::string> m_queuedLists;"
-    "    PAD = win 0x1e8;\n    win {\n    LevelControlsDelegate* m_levelControlsDelegate;\n    }\n    PAD = win 0x8;\n    std::set<std::string> m_queuedLists;")
-alpha_patch_class(GeometryDash GameLevelManager
-    "    int m_dailyTimeLeft;" "    PAD = win 0x4;\n    int m_dailyTimeLeft;")
-alpha_patch_class(GeometryDash GameLevelManager
-    "    cocos2d::CCDictionary* m_gauntletLevels;"
-    "    PAD = win 0x24;\n    cocos2d::CCDictionary* m_gauntletLevels;")
-alpha_patch_class(GeometryDash GameLevelManager
-    "    cocos2d::CCDictionary* m_storedLevels;"
-    "    std::unordered_map<int, std::string> m_usernameForAccountID;\n    cocos2d::CCDictionary* m_storedLevels;")
-alpha_patch_class(GeometryDash GameLevelManager
-    "    std::string m_searchKey;"
-    "    PAD = win 0x18;\n    std::string m_searchKey;")
-alpha_patch_class(GeometryDash GameLevelManager
-    "    LevelUploadDelegate* m_levelUploadDelegate;"
-    "    win {\n    CommentAdminDelegate* m_commentAdminDelegate;\n    ThreadMessageDelegate* m_threadMessageDelegate;\n    }\n    LevelUploadDelegate* m_levelUploadDelegate;")
-alpha_patch_class(GeometryDash GameLevelManager
-    "    UserInfoDelegate* m_userInfoDelegate;"
-    "    win {\n    EditorSoundUploadDelegate* m_editorSoundUploadDelegate;\n    EditorSoundListDelegate* m_editorSoundListDelegate;\n    EditorSoundDownloadDelegate* m_editorSoundDownloadDelegate;\n    EditorSoundDeleteDelegate* m_editorSoundDeleteDelegate;\n    }\n    UserInfoDelegate* m_userInfoDelegate;")
-alpha_patch_class(GeometryDash GameLevelManager
-    "    OnlineListDelegate* m_onlineListDelegate;"
-    "    win {\n    GJContentStatusDelegate* m_contentStatusDelegate;\n    }\n    PAD = win 0x8;\n    OnlineListDelegate* m_onlineListDelegate;")
-alpha_patch_class(GeometryDash GameLevelManager
-    "    LevelRateInfoDelegate* m_levelRateInfoDelegate;"
-    "    LevelRateInfoDelegate* m_levelRateInfoDelegate;\n    win {\n    SongUsageDelegate* m_songUsageDelegate;\n    }")
+if (WIN32)
+    # Native daily state begins at 0x3bc. Its content-state flag is at 0x3f0;
+    # the constructor initializes the four preceding integers at 0x3e0..0x3ec.
+    alpha_patch_class(GeometryDash GameLevelManager
+        "    int m_dailyTimeLeft;" "    PAD = win 0x4;\n    int m_dailyTimeLeft;")
+    alpha_patch_class(GeometryDash GameLevelManager
+        "    int m_onGetContentStatusCompletedIdx4;\n" "")
+    foreach(delegate IN ITEMS
+        "m_levelControlsDelegate|LevelControlsDelegate"
+        "m_adminDelegate|CommentAdminDelegate"
+        "m_sendThreadMessageDelegate|ThreadMessageDelegate"
+        "m_editorSoundUploadDelegate|EditorSoundUploadDelegate"
+        "m_getEditorSoundsDelegate|EditorSoundListDelegate"
+        "m_downloadEditorSoundDelegate|EditorSoundDownloadDelegate"
+        "m_deleteEditorSoundDelegate|EditorSoundDeleteDelegate"
+        "m_contentStatusDelegate|GJContentStatusDelegate"
+        "m_songUsageDelegate|SongUsageDelegate")
+        string(REPLACE "|" ";" parts "${delegate}")
+        list(GET parts 0 field)
+        list(GET parts 1 type)
+        alpha_patch_class(GeometryDash GameLevelManager
+            "    void* ${field};" "    ${type}* ${field};")
+    endforeach()
+endif()
 
-# ZeroConstructor cannot initialize the new native containers hidden in PAD.
+# ZeroConstructor cannot initialize the new native containers.
 set(alpha_manager_inline "${alpha_bindings_output}/inline/GameLevelManager.cpp")
 file(READ "${alpha_manager_inline}" alpha_manager_content)
 set(alpha_manager_old "ref = new GameLevelManager(geode::ZeroConstructor);")
@@ -398,11 +396,9 @@ alpha_patch_class(GeometryDash PagedListPopup
     "    virtual ~PagedListPopup() = win 0xc2af0;"
     "    PagedListPopup() = win 0xabc50;\n    virtual ~PagedListPopup() = win inline;")
 alpha_patch_class(GeometryDash PagedListPopup
-    "    virtual int requestPage(int) = win 0x9999999;"
+    "    // virtual int requestPage(int) = win 0x9999999;"
     "    inline virtual int requestPage(int) = 0;")
-alpha_patch_class(GeometryDash PagedListPopup
-    "    TodoReturn updatePageUI(int, int, int);"
-    "    TodoReturn updatePageUI(int, int, int);\n    PAD = win 0x70;")
+# The pinned upstream declarations now reserve its native 0x70-byte tail.
 # Native non-deleting 0xc2af0 releases the object at 0x2b8, then destroys
 # FLAlertLayer. Normal C++ base destruction avoids reconstructing an abstract
 # PagedListPopup, which the generic generated destructor cannot do.
@@ -418,7 +414,7 @@ alpha_patch_class(GeometryDash VirtualRowSource
     "    virtual int virtualRowHeight(int) = win 0x9999999;"
     "    inline virtual int virtualRowHeight(int) = 0;")
 alpha_patch_class(GeometryDash VirtualRowSource
-    "    virtual void mountVirtualRow() = win 0x9999999;"
+    "    virtual void mountVirtualRow(int, cocos2d::CCNode*, cocos2d::CCMenu*) = win 0x9999999;"
     "    inline virtual void mountVirtualRow(int, cocos2d::CCNode*, cocos2d::CCMenu*) = 0;")
 
 # Native queue mute/unmute responses dispatch through 0xd0/0xd8/0xe0/0xe8.
@@ -524,7 +520,7 @@ alpha_patch_class(GeometryDash ScrollViewPopup
     "    virtual ~ScrollViewPopup() = win 0x6218d0;"
     "    ScrollViewPopup() = win 0x47f7b0;\n    virtual ~ScrollViewPopup() = win inline;")
 alpha_patch_class(GeometryDash ScrollViewPopup
-    "    virtual float buildContent(cocos2d::CCNode*, float, float) = win 0x9999999;"
+    "    // virtual float buildContent(cocos2d::CCNode*, float, float) = win 0x9999999;"
     "    inline virtual float buildContent(cocos2d::CCNode*, float, float) = 0;")
 alpha_patch_class(GeometryDash ScrollViewPopup
     "    void onClose(cocos2d::CCObject* sender);"
@@ -679,17 +675,11 @@ if (WIN32)
         "    std::string m_inputPrefix;\n    std::string m_inputString;")
     set(alpha_number_inline "${alpha_bindings_output}/inline/NumberInputLayer.cpp")
     file(READ "${alpha_number_inline}" alpha_number_content)
-    set(alpha_number_constructor [=[NumberInputLayer::NumberInputLayer() {
-    m_okButton = nullptr;
-    m_minimum = 4;
-    m_maximum = 4;
-    m_delegate = nullptr;
-}]=])
     set(alpha_number_done [=[void NumberInputLayer::onDone(cocos2d::CCObject* sender) {
     if (m_delegate) m_delegate->numberInputClosed(this);
     this->onClose(nullptr);
 }]=])
-    foreach(body IN ITEMS "${alpha_number_constructor}" "${alpha_number_done}")
+    foreach(body IN ITEMS "${alpha_number_done}")
         string(FIND "${alpha_number_content}" "${body}" alpha_number_match)
         if (alpha_number_match LESS 0)
             message(FATAL_ERROR "Unexpected NumberInputLayer inline implementation")
@@ -701,9 +691,13 @@ if (WIN32)
     alpha_patch_class(GeometryDash ParentalGateLayer
         "static ParentalGateLayer* create() = m1"
         "static ParentalGateLayer* create() = win 0x4d3ba0, m1")
+    # The upstream tail compensates for its undersized NumberInputLayer.
+    # With that base corrected, only the native solution integer remains.
     alpha_patch_class(GeometryDash ParentalGateLayer
-        "    TodoReturn generateChallenge();"
-        "    TodoReturn generateChallenge();\n    int m_expectedAnswer;")
+        "    std::string m_inputtedValue;\n    void* m_unknown; // this may be incorrect\n    int m_solution;"
+        "    int m_solution;")
+    file(WRITE "${alpha_bindings_output}/inline/ParentalGateLayer.cpp"
+        "#include <Geode/binding/ParentalGateLayer.hpp>\n\n#ifdef GEODE_IS_WINDOWS\nParentalGateLayer::ParentalGateLayer() : m_solution(0) {}\n#endif\n")
 endif()
 alpha_patch_address(GeometryDash NumberInputLayer
     "void onNumber(cocos2d::CCObject* sender)" 0x4a1820 0x2157c0)
@@ -788,13 +782,12 @@ if (WIN32)
         "    virtual ~TabbedPopupLayer()"
         "    TabbedPopupLayer() = win 0x19cc00;\n    virtual ~TabbedPopupLayer()")
     alpha_patch_class(GeometryDash TabbedPopupLayer
-        "    TodoReturn refreshTabButtons(char const*, char const*);"
-        "    TodoReturn refreshTabButtons(char const*, char const*);\n    PAD = win 0x48;")
+        "    PAD = win 0x50, android64 0x48, android32 0x28;"
+        "    PAD = win 0x48, android64 0x48, android32 0x28;")
     alpha_patch_class(GeometryDash GameSettingsLayer
         "    TodoReturn toggleVisibility(bool);"
         "    TodoReturn toggleVisibility(bool);\n    GJBaseGameLayer* m_gameLayer;\n    PAD = win 0x68;")
-    alpha_patch_class(GeometryDash LevelBrowserLayer
-        "    bool m_cached;" "    bool m_cached;\n    PAD = win 0x28;")
+    # Upstream now declares the five native browser pointers at 0x320..0x340.
 
     # These native entry points are scalar deleting destructors. Pass zero
     # explicitly to retain the allocation, then use the SDK's destructor lock
@@ -830,14 +823,8 @@ if (WIN32)
             "virtual TodoReturn clearPageContent()" "virtual void clearPageContent()")
     endforeach()
 
-    # These callbacks have no native Windows vtable slot: each primary table
-    # ends at 0x430, and neither class has the corresponding delegate base.
-    alpha_patch_class(GeometryDash NewgroundsInfoLayer
-        "    virtual void FLAlert_Clicked(FLAlertLayer* layer, bool btn2) = win 0x9999999, imac"
-        "    [[missing(win)]]\n    virtual void FLAlert_Clicked(FLAlertLayer* layer, bool btn2) = imac")
-    alpha_patch_class(GeometryDash MusicBrowser
-        "    virtual void setTextPopupClosed(SetTextPopup* popup, std::string text) = win 0x9999999;"
-        "    [[missing(win)]]\n    virtual void setTextPopupClosed(SetTextPopup* popup, std::string text);")
+    # Upstream removed the obsolete Newgrounds alert and MusicBrowser text
+    # callbacks. Their native primary tables end at 0x430.
 
     # Concrete native pickers return a CCArray pointer and its unsigned count.
     # Require SDK users to supply these interface callbacks, rather than

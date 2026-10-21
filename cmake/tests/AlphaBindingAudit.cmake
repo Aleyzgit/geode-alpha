@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.25)
+include("${CMAKE_CURRENT_LIST_DIR}/../AlphaBindingAudit.cmake")
+
+function(check_count expected content)
+    alpha_count_windows_placeholders("${content}" actual)
+    if (NOT actual EQUAL expected)
+        message(FATAL_ERROR "Expected ${expected} active placeholders, found ${actual}")
+    endif()
+endfunction()
+
+check_count(1 "void active() = win 0x9999999;")
+check_count(0 "// void removed() = win 0x9999999;")
+check_count(0 "/* first line\nvoid removed() = win 0x9999999;\n*/")
+check_count(1 "void active() = win 0x9999999; // win 0x9999999")
+check_count(1 "void active(char const* url = \"https://example.test\") = win 0x9999999;")
+check_count(0 "char const* text = \"win 0x9999999\";")
+check_count(2 "// \"unterminated quote\nvoid first() = win 0x9999999;\n/* ignored */ void second() = win 0x9999999;")
+message(STATUS "PASS: active Windows binding placeholder counts")

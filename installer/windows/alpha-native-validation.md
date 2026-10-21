@@ -16,9 +16,9 @@ SDK implementations. Some removed native Windows classes, including
 MoreOptionsLayer, have no usable Windows implementation in the current game.
 
 The integrated upstream v6 revision is
-`26cd9ca` and the bindings revision is
-`d6f3312f0886b2c285fd0d2593ebabdc03b6ca0c`. The generated Windows build has
-5,465 populated native wrappers, all pointing into executable sections of
+`4457dd8` and the bindings revision is
+`9a9af08340e446a970d434502f84cc5de52251e5`. The generated Windows build has
+5,446 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The updated upstream declarations include the current gameplay-layer state
@@ -40,7 +40,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-91 checks cover native constructors, level/list cache fixtures, fresh/expired
+93 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -104,9 +104,12 @@ the label map at 0x1118. An actual counter object created in a temporary editor
 checks text updates, the native 999999999 upper limit, negative values, absent
 item IDs and the label's update lock.
 
-A local compiled-member-pointer audit compared 2,148 known mapped virtual
-methods across 461 classes with native RTTI tables. All matched after correcting
-84 slot or base-offset disagreements. GManager's save callbacks precede its
+A local compiled-member-pointer audit compared 2,116 known mapped virtual
+methods across 461 classes with native RTTI tables. All matched. An earlier
+audit identified 84 slot or base-offset disagreements that are now corrected.
+The smaller current sample reflects upstream removing 33 redundant or obsolete
+declarations, with ReportQueuePopup::rebuildContent added to the audit.
+GManager's save callbacks precede its
 load callbacks; the gameplay hitbox callbacks precede section/group methods.
 Custom SFX and table-cell callbacks use the current native order and bool/int
 return types. Runtime fixtures check derived editor dispatch and typed delegate
@@ -124,6 +127,30 @@ exercise SDK-derived tab/browser construction and destruction boundaries, plus
 native game-settings creation, tab selection and dropdown delegate dispatch.
 Generated state-header dependencies are included explicitly so that changing
 unity source order does not conceal missing map, array or cocos type includes.
+
+The newer upstream manager fields replace the earlier opaque cache padding.
+GameLevelManager's daily state still needs four bytes before m_dailyTimeLeft
+at 0x3bc; removing the duplicated content-status integer keeps the native
+current-ID fields at 0x3e0..0x3ec and content-status flag at 0x3f0. Existing
+cache/delegate fixtures verify the retained offsets. Upstream's new browser
+pointer fields and paged-popup storage are used without duplicate padding.
+TabbedPopupLayer's Windows tail remains the verified 0x48 bytes.
+
+A separate compiled-size comparison covers all 548 upstream Windows references.
+It reports 142 differences requiring native verification; these are not a list
+of proven defects because some reference sizes are inconsistent with native
+construction. For example, GameManager's fields start before the reference's
+claimed GManager size. No automatic padding is applied from this comparison.
+This remaining investigation is another reason the port is not a full release.
+
+The upstream Popup touch-priority correction registers (2, 0). A fixture checks
+the target-priority change, absence of a new owned touch level and restoration
+on destruction. ParentalGateLayer's SDK constructor initializes the native
+solution integer after the corrected NumberInputLayer base; a guarded allocation
+checks that construction/destruction stay within its 0x308 bytes.
+The release placeholder counter ignores comments and quoted strings. Seven
+CMake fixtures verify that commented-out old declarations do not block releases
+and that real unresolved declarations, including after URL defaults, still count.
 
 GJLevelList::reorderLevel uses 0x272d00, also called by native list-row actions;
 tests cover moves in both directions, clamped positions, absent IDs, one-item

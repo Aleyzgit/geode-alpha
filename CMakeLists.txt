@@ -85,7 +85,7 @@ if (NOT GEODE_BINDINGS_REPO_PATH)
 	)
 	CPMAddPackage(NAME "bindings"
 		GITHUB_REPOSITORY "geode-sdk/bindings"
-		GIT_TAG "d6f3312f0886b2c285fd0d2593ebabdc03b6ca0c"
+		GIT_TAG "9a9af08340e446a970d434502f84cc5de52251e5"
 		DOWNLOAD_ONLY YES
 		NO_CACHE YES
 	)
@@ -270,10 +270,10 @@ CPMAddPackage(NAME fmt
 
 # allow overriding asp / arc versions
 if (NOT DEFINED GEODE_ARC_VERSION)
-	set(GEODE_ARC_VERSION "@1.6.1" CACHE STRING "")
+	set(GEODE_ARC_VERSION "@1.6.2" CACHE STRING "")
 endif()
 if (NOT DEFINED GEODE_ASP_VERSION)
-	set(GEODE_ASP_VERSION "@1.4.2" CACHE STRING "")
+	set(GEODE_ASP_VERSION "@1.4.3" CACHE STRING "")
 endif()
 
 CPMAddPackage("gh:dankmeme01/asp2${GEODE_ASP_VERSION}")

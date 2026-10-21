@@ -28,17 +28,6 @@ if (NOT GEODE_BINDINGS_PATH)
         "int getIntGameVariable(char const* key) = win 0x27ec70;"
         alpha_bindings "${alpha_bindings}")
 
-    # The constructor initializes additional Windows cache/state storage. Keep
-    # m_valueKeeper at 0x1b0, m_customObjectDict at 0x1d0 and m_playLayer at 0x230.
-    string(REPLACE
-        "    bool m_switchModes;"
-        "    PAD = win 0x18;\n    bool m_switchModes;"
-        alpha_bindings "${alpha_bindings}")
-    string(REPLACE
-        "    cocos2d::CCDictionary* m_unlockValueKeeper;"
-        "    cocos2d::CCDictionary* m_unlockValueKeeper;\n    PAD = win 0x10;"
-        alpha_bindings "${alpha_bindings}")
-
     file(CONFIGURE OUTPUT "${alpha_bindings_output}/GeometryDash.bro"
         CONTENT "${alpha_bindings}" @ONLY)
     include("${CMAKE_CURRENT_LIST_DIR}/AlphaWindowsAddresses.cmake")
@@ -75,12 +64,11 @@ if (NOT EXISTS "${GEODE_BINDINGS_PATH}/GeometryDash.bro")
     message(FATAL_ERROR "Missing GeometryDash.bro in ${GEODE_BINDINGS_PATH}")
 endif()
 file(GLOB_RECURSE alpha_binding_files "${GEODE_BINDINGS_PATH}/*.bro")
+include("${CMAKE_CURRENT_LIST_DIR}/AlphaBindingAudit.cmake")
 set(alpha_missing_count 0)
 foreach(alpha_binding_file IN LISTS alpha_binding_files)
     file(READ "${alpha_binding_file}" alpha_binding_content)
-    string(REGEX MATCHALL "win[ \t]+0x9999999"
-        alpha_missing_bindings "${alpha_binding_content}")
-    list(LENGTH alpha_missing_bindings alpha_missing_in_file)
+    alpha_count_windows_placeholders("${alpha_binding_content}" alpha_missing_in_file)
     math(EXPR alpha_missing_count
         "${alpha_missing_count} + ${alpha_missing_in_file}")
 endforeach()
