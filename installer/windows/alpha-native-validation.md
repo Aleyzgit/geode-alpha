@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 29 Windows address placeholders are in
+respective modules. The remaining 27 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,480 populated native wrappers, all pointing into executable sections of
+5,482 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -87,6 +87,19 @@ flags zero. A guarded fixture clicks two custom test entries, rejects invalid
 indices and frees a heap-backed pending string. No user bindings are imported,
 exported or reset by these checks.
 
+LevelBrowserLayer::updatePageLabel at 0x3e6a20 updates page text at 0x2a8 and
+folder text at 0x2b8 from its search object. Fixtures verify one-based pages,
+folder numbers, last-page-button visibility and missing optional controls.
+LevelTools::posForTimeInternal at 0x4676d0 has seven native arguments. The old
+eight-argument SDK overload forwards to it without the unused tail argument;
+the seven-argument overload provides the actual hook signature. Empty/null
+timeline fixtures check all five native speeds, platformer behavior, negative
+and zero time and preservation of an untouched rotation-channel output.
+A fresh editor with two real speed portals supplies a separate native-call
+oracle at several times. The fixture verifies that the portals affect travel,
+using their native sorted leading edges rather than sprite-center positions.
+Temporary timewarp and direction globals are restored after the comparison.
+
 The updated upstream declarations include the current gameplay-layer state
 and additional editor-window functions. Removed Windows classes such as
 EditorOptionsLayer, GameOptionsLayer and GJWriteMessagePopup are marked missing.
@@ -106,7 +119,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-133 checks cover native constructors, level/list cache fixtures, fresh/expired
+136 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore

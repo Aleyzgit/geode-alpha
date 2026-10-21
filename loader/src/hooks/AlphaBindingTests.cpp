@@ -12,6 +12,8 @@
 #include <Geode/binding/CommentAdminDelegate.hpp>
 #include <Geode/binding/CreateGuidelinesLayer.hpp>
 #include <Geode/binding/CustomSFXDelegate.hpp>
+#include <Geode/binding/DrawGridLayer.hpp>
+#include <Geode/binding/EffectGameObject.hpp>
 #include <Geode/binding/EditorUI.hpp>
 #include <Geode/binding/EditorWindowPopup.hpp>
 #include <Geode/binding/EnterEffectObject.hpp>
@@ -38,6 +40,7 @@
 #include <Geode/binding/GJSpriteColor.hpp>
 #include <Geode/binding/GJStoreItem.hpp>
 #include <Geode/binding/GJShaderState.hpp>
+#include <Geode/binding/GJSearchObject.hpp>
 #include <Geode/binding/GJUINode.hpp>
 #include <Geode/binding/GJUserScore.hpp>
 #include <Geode/binding/LocalLevelManager.hpp>
@@ -51,6 +54,8 @@
 #include <Geode/binding/LevelBrowserLayer.hpp>
 #include <Geode/binding/LevelListLayer.hpp>
 #include <Geode/binding/LevelSearchLayer.hpp>
+#include <Geode/binding/LevelSettingsObject.hpp>
+#include <Geode/binding/LevelTools.hpp>
 #include <Geode/binding/MusicDownloadManager.hpp>
 #include <Geode/binding/MusicBrowser.hpp>
 #include <Geode/binding/MusicSearchResult.hpp>
@@ -2054,6 +2059,115 @@ $on_game(Loaded) {
         return checkConstructionBoundary<AlphaTabbedFixture>() &&
             checkConstructionBoundary<AlphaBrowserFixture>() &&
             checkConstructionBoundary<AlphaListFixture>();
+    });
+
+    runBindingTest("Native empty timeline positions", [] {
+        float speeds[] = {311.5801086425781f, 251.1600799560547f, 387.4201354980469f,
+            468.0001525878906f, 576.0001831054688f};
+        auto empty = CCArray::create();
+        for (int speed = 0; speed < 5; ++speed) {
+            for (bool platformer : {false, true}) {
+                for (float time : {-1.f, 0.f, 0.5f, 2.f}) {
+                    int channel = 717171;
+                    auto direct = LevelTools::posForTimeInternal(time, nullptr, speed, platformer,
+                        true, true, channel, 77);
+                    auto expected = speeds[platformer ? 0 : speed] * time;
+                    if (std::abs(direct.x - expected) > 0.001f || direct.y != 0.f || channel != 717171) return false;
+                    auto typed = LevelTools::posForTimeInternal(time, nullptr, speed, platformer,
+                        true, true, channel);
+                    if (typed != direct || channel != 717171) return false;
+                    auto wrapper = LevelTools::posForTime(time, empty, speed, platformer, channel);
+                    if (direct != wrapper || channel != 717171) return false;
+                }
+            }
+        }
+        return true;
+    });
+
+    runBindingTest("Native timeline positions match editor", [] {
+        return withNativeEditor(true, [](LevelEditorLayer* editor) {
+            if (!editor->m_drawGridLayer || !editor->m_drawGridLayer->m_speedObjects ||
+                offsetof(EffectGameObject, m_speedStart) != 0x708 ||
+                offsetof(EffectGameObject, m_speedModType) != 0x706) return false;
+            auto first = typeinfo_cast<EffectGameObject*>(editor->createObject(200, {90.f, 105.f}, false));
+            auto second = typeinfo_cast<EffectGameObject*>(editor->createObject(203, {300.f, 105.f}, false));
+            if (!first || !second) return false;
+            auto grid = editor->m_drawGridLayer;
+            grid->addToSpeedObjects(first);
+            grid->addToSpeedObjects(second);
+            grid->sortSpeedObjects();
+            // Native sorting uses each portal's leading edge, not its center.
+            if (grid->m_speedObjects->count() < 2 || first->m_speedStart.x <= 0.f ||
+                first->m_speedStart.x >= first->getPositionX() ||
+                second->m_speedStart.x <= first->m_speedStart.x ||
+                second->m_speedStart.x >= second->getPositionX() ||
+                first->m_speedModType == second->m_speedModType) return false;
+            auto& warp = *reinterpret_cast<float*>(base::get() + 0x8fe4f8);
+            auto& axis = *reinterpret_cast<bool*>(base::get() + 0x9097df);
+            auto& reverse = *reinterpret_cast<bool*>(base::get() + 0x90bd0c);
+            AlphaTestField warpState(warp, warp);
+            AlphaTestField axisState(axis, axis);
+            AlphaTestField reverseState(reverse, reverse);
+            auto settings = editor->m_levelSettings;
+            bool affectedByPortals = false;
+            for (float time : {0.f, 0.125f, 0.75f, 2.f, 4.f}) {
+                int channel = 717171;
+                auto actual = LevelTools::posForTimeInternal(time, grid->m_speedObjects,
+                    static_cast<int>(settings->m_startSpeed), settings->m_platformerMode,
+                    false, false, channel, 77);
+                auto expected = editor->posForTime(time);
+                affectedByPortals = affectedByPortals || std::abs(expected.x - 311.5801086425781f * time) > 0.001f;
+                if (std::abs(actual.x - expected.x) > 0.001f ||
+                    std::abs(actual.y - expected.y) > 0.001f ||
+                    channel != editor->m_gameState.m_rotateChannel) return false;
+            }
+            return affectedByPortals;
+        });
+    });
+
+    runBindingTest("Native browser page and folder labels", [] {
+        if (offsetof(LevelBrowserLayer, m_pageText) != 0x2a8 ||
+            offsetof(LevelBrowserLayer, m_folderText) != 0x2b8 ||
+            offsetof(GJSearchObject, m_page) != 0x1a8 ||
+            offsetof(GJSearchObject, m_folder) != 0x1c4) return false;
+        auto manager = GameManager::sharedState();
+        AlphaTestField scene(manager->m_sceneEnum, manager->m_sceneEnum);
+        auto browser = std::make_unique<LevelBrowserLayer>();
+        auto search = GJSearchObject::create(SearchType::MyLevels);
+        auto page = CCLabelBMFont::create("old page", "bigFont.fnt");
+        auto folder = CCLabelBMFont::create("old folder", "bigFont.fnt");
+        auto arrow = CCMenuItemSpriteExtra::create(CCSprite::create(), nullptr, nullptr);
+        if (!search || !page || !folder || !arrow) return false;
+        AlphaTestField searchField(browser->m_searchObject, search);
+        AlphaTestField pageField(browser->m_pageText, page);
+        AlphaTestField folderField(browser->m_folderText, folder);
+        AlphaTestField arrowField(browser->m_lastBtn, arrow);
+        AlphaTestField lastPage(browser->m_lastPage, 1);
+        search->m_page = 42;
+        search->m_folder = 17;
+        browser->updatePageLabel();
+        if (std::string(page->getString()) != "43" || std::string(folder->getString()) != "17" ||
+            !arrow->isVisible()) return false;
+        search->m_page = 0;
+        search->m_folder = 0;
+        browser->m_lastPage = 0;
+        browser->updatePageLabel();
+        if (std::string(page->getString()) != "1" || std::string(folder->getString()) != "0" ||
+            arrow->isVisible()) return false;
+        browser->m_searchObject = nullptr;
+        page->setString("missing search");
+        folder->setString("missing search");
+        browser->updatePageLabel();
+        if (std::string(page->getString()) != "1" || std::string(folder->getString()) != "0") return false;
+        browser->m_pageText = nullptr;
+        browser->m_lastPage = 1;
+        folder->setString("unchanged");
+        browser->updatePageLabel();
+        if (std::string(folder->getString()) != "unchanged" || arrow->isVisible()) return false;
+        browser->m_pageText = page;
+        browser->m_folderText = nullptr;
+        browser->updatePageLabel();
+        return std::string(page->getString()) == "1" && arrow->isVisible();
     });
 
     runBindingTest("Native keybinding popup construction", [] {

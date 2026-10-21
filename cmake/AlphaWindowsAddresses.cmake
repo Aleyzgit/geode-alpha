@@ -80,6 +80,20 @@ foreach(class IN ITEMS MoreVideoOptionsLayer ParentalOptionsLayer)
     alpha_patch_address(GeometryDash "${class}" "int countForPage(int page)" 0x4cfb00)
 endforeach()
 alpha_patch_address(GeometryDash GameStatsManager "void trySelectActivePath()" 0x2da5f0)
+alpha_patch_address(GeometryDash LevelBrowserLayer "void updatePageLabel()" 0x3e6a20)
+# The native timeline helper has seven arguments. Retain the SDK's older
+# eight-argument overload as a forwarding helper, excluding its unused tail.
+set(alpha_timeline_signature "static cocos2d::CCPoint posForTimeInternal(float time, cocos2d::CCArray* objects, int speed, bool platformer, bool ignoreMinorAxis, bool ignoreWarp, int& rotateChannel, int unused)")
+alpha_patch_address(GeometryDash LevelTools "${alpha_timeline_signature}" inline)
+alpha_patch_class(GeometryDash LevelTools "    ${alpha_timeline_signature}"
+    "    static cocos2d::CCPoint posForTimeInternal(float time, cocos2d::CCArray* objects, int speed, bool platformer, bool ignoreMinorAxis, bool ignoreWarp, int& rotateChannel) = win 0x4676d0;\n    ${alpha_timeline_signature}")
+file(APPEND "${alpha_bindings_output}/inline/LevelTools.cpp" [=[
+#ifdef GEODE_IS_WINDOWS
+cocos2d::CCPoint LevelTools::posForTimeInternal(float time, cocos2d::CCArray* objects, int speed, bool platformer, bool ignoreMinorAxis, bool ignoreWarp, int& rotateChannel, int) {
+    return posForTimeInternal(time, objects, speed, platformer, ignoreMinorAxis, ignoreWarp, rotateChannel);
+}
+#endif
+]=])
 foreach(class IN ITEMS MoreVideoOptionsLayer ParentalOptionsLayer)
     set(alpha_options_inline "${alpha_bindings_output}/inline/${class}.cpp")
     file(READ "${alpha_options_inline}" alpha_options_content)
