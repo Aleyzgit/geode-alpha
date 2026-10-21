@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 24 Windows address placeholders are in
+respective modules. The remaining 22 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,484 populated native wrappers, all pointing into executable sections of
+5,486 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -54,6 +54,16 @@ Fixtures cover all three native middleground indices, tile positions, texture
 identity, repeated resizing and a missing optional second sprite. A guarded
 constructor/destructor fixture checks the 0x1e8 allocation. Its scalar deleting
 destructor at 0x386c60 now receives explicit deletion flags zero.
+gameEventTriggered at 0x33ac80 dispatches through TriggerEffectDelegate using
+event/material/player keys and m_commandIndex for per-frame suppression.
+A derived SDK fixture receives the real native spawnGroup callbacks and checks
+player-specific and general entries, inactive entries, remap vectors, trigger
+and control IDs, repeat suppression and dispatch on the following frame.
+LevelOptionsLayer::init at 0x45d1a0 initializes the native options controls.
+A fresh editor fixture checks ordinary and legacy option pages, reversible
+mini-mode toggling and the tag-13 spawn-group field at 0x1c4, including integer
+conversion and unrelated tags. All changed level settings belong to that
+disposable editor level.
 Native updateExtraGameLayers at 0x32b500 copies position and both scale axes.
 GJUINode::create now uses 0x673b50, whose native allocation is 0x188; the old
 0x66d6e0 address created an unrelated 0x160-byte node. The 0x674070 position
@@ -130,7 +140,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-141 checks cover native constructors, level/list cache fixtures, fresh/expired
+143 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore

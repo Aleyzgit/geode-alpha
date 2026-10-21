@@ -36,6 +36,8 @@ $expected = @(
     'Native particle allocation boundary',
     'Native single button configuration reset',
     'Native shader construction and split tweens',
+    'Native gameplay event dispatch and frame cache',
+    'Native level option initialization and callbacks',
     'Native middleground construction boundary',
     'Native middleground initialization',
     'Native middleground tile resizing',

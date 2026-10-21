@@ -54,6 +54,8 @@
 #include <Geode/binding/LevelEditorLayer.hpp>
 #include <Geode/binding/LevelBrowserLayer.hpp>
 #include <Geode/binding/LevelListLayer.hpp>
+#include <Geode/binding/LevelOptionsLayer.hpp>
+#include <Geode/binding/LevelOptionsLayer2.hpp>
 #include <Geode/binding/LevelSearchLayer.hpp>
 #include <Geode/binding/LevelSettingsObject.hpp>
 #include <Geode/binding/LevelTools.hpp>
@@ -123,6 +125,23 @@ static_assert(std::is_abstract_v<CCKeyboardActionManager>);
 static_assert(std::is_abstract_v<EditorWindowPopup>);
 static_assert(std::is_abstract_v<ScrollViewPopup>);
 namespace {
+    class AlphaEventFixture final : public GJBaseGameLayer {
+    public:
+        struct Call {
+            int group;
+            bool ordered;
+            double delay;
+            std::vector<int> remap;
+            int trigger;
+            int control;
+        };
+        std::vector<Call> calls;
+        void spawnGroup(int group, bool ordered, double delay, std::vector<int> const& remap,
+            int trigger, int control) override {
+            calls.push_back({group, ordered, delay, remap, trigger, control});
+        }
+    };
+
     class AlphaKeybindEntryReceiver final : public CCObject {
     public:
         unsigned calls = 0;
@@ -702,6 +721,79 @@ $on_game(Loaded) {
         lifetime.reset();
         return std::all_of(storage.begin() + sizeof(GJShaderState), storage.end(),
             [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native gameplay event dispatch and frame cache", [] {
+        auto layer = std::make_unique<AlphaEventFixture>();
+        auto& state = layer->m_gameState;
+        if (offsetof(GJGameState, m_commandIndex) != 0x238 ||
+            offsetof(GJGameState, m_unkMapPairGJGameEventIntVectorEventTriggerInstance) != 0x3e0 ||
+            offsetof(GJGameState, m_unkMapPairGJGameEventIntInt) != 0x3f0) return false;
+        auto& events = state.m_unkMapPairGJGameEventIntVectorEventTriggerInstance;
+        auto& frames = state.m_unkMapPairGJGameEventIntInt;
+        events.clear();
+        frames.clear();
+        auto event = GJGameEvent::NormalJump;
+        auto add = [&](int key, int target, bool inactive) {
+            EventTriggerInstance entry;
+            entry.m_targetID = target;
+            entry.m_uniqueID = target + 100;
+            entry.m_controlID = target + 200;
+            entry.m_inactive = inactive;
+            entry.m_remapKeys = {31, 47};
+            events[{event, key}].push_back(entry);
+        };
+        add(40001, 17, false);
+        add(40001, 99, true);
+        add(40000, 18, false);
+        add(40002, 19, false);
+        state.m_commandIndex = 71;
+        layer->gameEventTriggered(event, 4, 1);
+        if (layer->calls.size() != 2 || layer->calls[0].group != 17 || layer->calls[1].group != 18 ||
+            frames.at({event, 40001}) != 71 || frames.at({event, 40000}) != 71) return false;
+        layer->gameEventTriggered(event, 4, 1);
+        if (layer->calls.size() != 2) return false;
+        layer->gameEventTriggered(event, 4, 2);
+        if (layer->calls.size() != 3 || layer->calls.back().group != 19 ||
+            frames.at({event, 40002}) != 71) return false;
+        state.m_commandIndex = 72;
+        layer->gameEventTriggered(event, 4, 1);
+        layer->gameEventTriggered(event, 4, 0);
+        if (layer->calls.size() != 5 || frames.at({event, 40000}) != 72) return false;
+        events.at({event, 40001})[0].m_inactive = true;
+        state.m_commandIndex = 73;
+        layer->gameEventTriggered(event, 4, 1);
+        layer->gameEventTriggered(event, 5, 0);
+        if (layer->calls.size() != 6 || layer->calls.back().group != 18 ||
+            frames.size() != 4 || frames.at({event, 50000}) != 73) return false;
+        return std::all_of(layer->calls.begin(), layer->calls.end(), [](auto const& call) {
+            return !call.ordered && call.delay == 0.0 && call.remap == std::vector<int>{31, 47} &&
+                call.trigger == call.group + 100 && call.control == call.group + 200;
+        });
+    });
+
+    runBindingTest("Native level option initialization and callbacks", [] {
+        return withNativeEditor(true, [](LevelEditorLayer* editor) {
+            auto settings = editor->m_levelSettings;
+            auto popup = std::make_unique<LevelOptionsLayer>();
+            if (sizeof(LevelOptionsLayer) != 0x478 || offsetof(LevelOptionsLayer, m_settingsObject) != 0x470 ||
+                !popup->init(settings) || popup->m_settingsObject != settings ||
+                popup->m_gap != 40.f || popup->m_maxLabelScale != 0.4f ||
+                !popup->m_values || !popup->m_variables || !popup->m_mainLayer) return false;
+            auto mini = settings->m_startMini;
+            popup->didToggle(0);
+            if (settings->m_startMini == mini) return false;
+            popup->didToggle(0);
+            if (settings->m_startMini != mini) return false;
+            popup->valueDidChange(13, 23.75f);
+            if (offsetof(LevelSettingsObject, m_spawnGroup) != 0x1c4 ||
+                settings->m_spawnGroup != 23 || popup->getValue(13) != 23.f) return false;
+            popup->valueDidChange(-1, 91.f);
+            if (popup->getValue(-1) != 0.f || settings->m_spawnGroup != 23) return false;
+            auto legacy = std::make_unique<LevelOptionsLayer2>();
+            return legacy->init(settings) && legacy->m_settingsObject == settings && legacy->m_mainLayer &&
+                legacy->m_values && legacy->m_variables;
+        });
     });
 
     runBindingTest("Native middleground construction boundary", [] {

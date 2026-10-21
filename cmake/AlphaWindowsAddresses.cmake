@@ -71,6 +71,8 @@ alpha_patch_address(GeometryDash GJUINode "void updateButtonPositions()" 0x67407
 alpha_patch_address(GeometryDash GJMGLayer "bool init(int index)" 0x387b80)
 alpha_patch_address(GeometryDash GJMGLayer
     "void loadGroundSprites(int count, bool ground1)" 0x3880b0)
+alpha_patch_address(GeometryDash LevelOptionsLayer
+    "bool init(LevelSettingsObject* object)" 0x45d1a0)
 
 # GJOptionsLayer's toggle builder increments its page count through this
 # routine. The older SDK declaration had no Windows implementation at all.
@@ -124,6 +126,8 @@ file(APPEND "${alpha_bindings_output}/inline/GJShaderState.cpp" "\n${alpha_shade
 
 # EffectGameObject::triggerObject calls these with the complete game-layer
 # pointer. Their maps and channel vectors live in its GJGameState subobject.
+alpha_patch_address(GeometryDash GJBaseGameLayer
+    "void gameEventTriggered(GJGameEvent event, int material, int playerID)" 0x33ac80)
 alpha_patch_address(GeometryDash GJBaseGameLayer
     "int generateEnterEasingBuffer(int easingType, float easingRate)" 0x314ac0)
 alpha_patch_address(GeometryDash GJBaseGameLayer
