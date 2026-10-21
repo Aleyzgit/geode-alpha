@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 20 Windows address placeholders are in
+respective modules. The remaining 19 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -137,6 +137,14 @@ A fresh editor with two real speed portals supplies a separate native-call
 oracle at several times. The fixture verifies that the portals affect travel,
 using their native sorted leading edges rather than sprite-center positions.
 Temporary timewarp and direction globals are restored after the comparison.
+LevelTools::getLevelList returns the 43 IDs embedded in the native
+GameManager::recountUserStats routine. Windows inlines the set construction,
+so the SDK provides an owning unordered_set instead of exposing an interior
+instruction address. The fixture checks range boundaries and independent
+return values, and compares native level metadata. The progress set includes
+IDs from other game editions; the Windows metadata getter falls back to
+Stereo Madness for those, while providing the 22 main levels, The Challenge
+and four Tower levels directly. The SDK retains all IDs from the native set.
 
 The updated upstream declarations include the current gameplay-layer state
 and additional editor-window functions. Removed Windows classes such as
@@ -157,7 +165,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-146 checks cover native constructors, level/list cache fixtures, fresh/expired
+147 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore

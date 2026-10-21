@@ -134,6 +134,7 @@ $expected = @(
     'Native game settings tabs',
     'Native keybinding popup construction',
     'Native browser page and folder labels',
+    'SDK main level list and native metadata',
     'Native empty timeline positions',
     'Native timeline positions match editor',
     'Native keybinding tabs and search',

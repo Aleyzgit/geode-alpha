@@ -86,6 +86,20 @@ foreach(class IN ITEMS MoreVideoOptionsLayer ParentalOptionsLayer)
 endforeach()
 alpha_patch_address(GeometryDash GameStatsManager "void trySelectActivePath()" 0x2da5f0)
 alpha_patch_address(GeometryDash LevelBrowserLayer "void updatePageLabel()" 0x3e6a20)
+# GameManager::recountUserStats inlines this 43-level set in Windows 2.2091.
+# Keep the SDK's owning return value instead of binding an interior address.
+alpha_patch_address(GeometryDash LevelTools "static std::unordered_set<int> getLevelList()" inline)
+file(APPEND "${alpha_bindings_output}/inline/LevelTools.cpp" [=[
+#ifdef GEODE_IS_WINDOWS
+std::unordered_set<int> LevelTools::getLevelList() {
+    return {
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+        3001, 1001, 1002, 1003, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+        4001, 4002, 4003, 5001, 5002, 5003, 5004
+    };
+}
+#endif
+]=])
 # The native timeline helper has seven arguments. Retain the SDK's older
 # eight-argument overload as a forwarding helper, excluding its unused tail.
 set(alpha_timeline_signature "static cocos2d::CCPoint posForTimeInternal(float time, cocos2d::CCArray* objects, int speed, bool platformer, bool ignoreMinorAxis, bool ignoreWarp, int& rotateChannel, int unused)")

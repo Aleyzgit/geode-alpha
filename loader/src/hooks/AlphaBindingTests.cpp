@@ -2385,6 +2385,28 @@ $on_game(Loaded) {
             checkConstructionBoundary<AlphaListFixture>();
     });
 
+    runBindingTest("SDK main level list and native metadata", [] {
+        auto levels = LevelTools::getLevelList();
+        if (levels.size() != 43) return false;
+        for (int id : levels) {
+            auto level = LevelTools::getLevel(id, true);
+            // The native progress set includes other editions' IDs. This
+            // executable's metadata getter falls back to level 1 for those.
+            auto expectedID = id <= 22 || id == 3001 || (id >= 5001 && id <= 5004) ? id : 1;
+            if (!level || level->m_levelID != expectedID || level->m_levelName.empty()) return false;
+        }
+        for (int id : {1, 22, 3001, 1001, 1003, 2001, 2010, 4001, 4003, 5001, 5004}) {
+            if (!levels.contains(id)) return false;
+        }
+        for (int id : {-1, 0, 23, 1000, 1004, 2000, 2011, 3000, 3002, 4000, 4004, 5000, 5005}) {
+            if (levels.contains(id)) return false;
+        }
+        levels.erase(1);
+        levels.insert(-717171);
+        auto independent = LevelTools::getLevelList();
+        return independent.size() == 43 && independent.contains(1) && !independent.contains(-717171);
+    });
+
     runBindingTest("Native empty timeline positions", [] {
         float speeds[] = {311.5801086425781f, 251.1600799560547f, 387.4201354980469f,
             468.0001525878906f, 576.0001831054688f};
