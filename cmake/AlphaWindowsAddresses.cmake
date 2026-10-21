@@ -68,6 +68,9 @@ alpha_patch_address(GeometryDash UIButtonConfig "void resetOneBtn()" 0x275970)
 alpha_patch_address(GeometryDash GJUINode
     "static GJUINode* create(UIButtonConfig& config)" 0x673b50 0x66d6e0)
 alpha_patch_address(GeometryDash GJUINode "void updateButtonPositions()" 0x674070)
+alpha_patch_address(GeometryDash GJMGLayer "bool init(int index)" 0x387b80)
+alpha_patch_address(GeometryDash GJMGLayer
+    "void loadGroundSprites(int count, bool ground1)" 0x3880b0)
 
 # GJOptionsLayer's toggle builder increments its page count through this
 # routine. The older SDK declaration had no Windows implementation at all.
@@ -121,6 +124,8 @@ file(APPEND "${alpha_bindings_output}/inline/GJShaderState.cpp" "\n${alpha_shade
 
 # EffectGameObject::triggerObject calls these with the complete game-layer
 # pointer. Their maps and channel vectors live in its GJGameState subobject.
+alpha_patch_address(GeometryDash GJBaseGameLayer
+    "int generateEnterEasingBuffer(int easingType, float easingRate)" 0x314ac0)
 alpha_patch_address(GeometryDash GJBaseGameLayer
     "void addCustomEnterEffect(EnterEffectObject* object, bool enter)" 0x314490)
 alpha_patch_address(GeometryDash GJBaseGameLayer
@@ -1051,6 +1056,7 @@ if (WIN32)
     alpha_patch_deleting_destructor(TabbedPopupLayer 0x19cd00)
     alpha_patch_deleting_destructor(GameSettingsLayer 0x2c2530)
     alpha_patch_deleting_destructor(KeybindingsSettingsPopup 0x3d8e30 PRESERVE_INLINE)
+    alpha_patch_deleting_destructor(GJMGLayer 0x386c60)
 endif()
 
 # Options factories allocate 0x78 and 0x300. The native row reads its count at

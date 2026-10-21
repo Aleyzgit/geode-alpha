@@ -34,6 +34,7 @@
 #include <Geode/binding/GManager.hpp>
 #include <Geode/binding/GJLevelList.hpp>
 #include <Geode/binding/GJMultiplayerManager.hpp>
+#include <Geode/binding/GJMGLayer.hpp>
 #include <Geode/binding/GJOptionsLayer.hpp>
 #include <Geode/binding/GJRequestCell.hpp>
 #include <Geode/binding/GJRewardItem.hpp>
@@ -701,6 +702,146 @@ $on_game(Loaded) {
         lifetime.reset();
         return std::all_of(storage.begin() + sizeof(GJShaderState), storage.end(),
             [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native middleground construction boundary", [] {
+        alignas(GJMGLayer) std::array<uint8_t, sizeof(GJMGLayer) + 32> storage;
+        storage.fill(0xa5);
+        auto layer = new (storage.data()) GJMGLayer();
+        auto valid = sizeof(GJMGLayer) == 0x1e8 &&
+            offsetof(GJMGLayer, m_ground1Sprite) == 0x198 &&
+            offsetof(GJMGLayer, m_mg1BatchNode) == 0x1d0 &&
+            !layer->m_ground1Sprite && !layer->m_ground2Sprite &&
+            !layer->m_mg1BatchNode && !layer->m_mg2BatchNode &&
+            !layer->m_showGround && layer->m_showGround1 && layer->m_showGround2;
+        layer->~GJMGLayer();
+        return valid && std::all_of(storage.begin() + sizeof(GJMGLayer), storage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native middleground initialization", [] {
+        AlphaTestField loaded(GameManager::get()->m_loadedMG, GameManager::get()->m_loadedMG);
+        for (int index : {1, 2, 3}) {
+            auto layer = std::make_unique<GJMGLayer>();
+            if (!layer->init(index) || !layer->m_ground1Sprite || !layer->m_ground2Sprite ||
+                !layer->m_mg1BatchNode || !layer->m_mg2BatchNode || layer->m_textureWidth <= 0.f ||
+                layer->m_ground1Sprite->getParent() != layer->m_mg1BatchNode ||
+                layer->m_ground2Sprite->getParent() != layer->m_mg2BatchNode ||
+                layer->m_ground2Offset != GJMGLayer::defaultYOffsetForBG2(index)) return false;
+            auto expected = unsigned(std::ceil(CCDirector::sharedDirector()->getWinSize().width /
+                layer->m_textureWidth) + 1.f);
+            for (auto sprite : {layer->m_ground1Sprite, layer->m_ground2Sprite}) {
+                if (sprite->getChildrenCount() != expected) return false;
+            }
+        }
+        return true;
+    });
+
+    runBindingTest("Native middleground tile resizing", [] {
+        auto layer = std::make_unique<GJMGLayer>();
+        auto first = CCSprite::createWithSpriteFrameName("infoIcon_001.png");
+        auto second = CCSprite::createWithSpriteFrameName("infoIcon_001.png");
+        if (!first || !second) return false;
+        layer->m_ground1Sprite = first;
+        layer->m_ground2Sprite = second;
+        layer->addChild(first);
+        layer->addChild(second);
+        for (bool ground1 : {true, false}) {
+            auto selected = ground1 ? first : second;
+            auto other = ground1 ? second : first;
+            auto otherCount = other->getChildrenCount();
+            for (int count : {4, 4, 1, 0, 3}) {
+                layer->loadGroundSprites(count, ground1);
+                if (selected->getChildrenCount() != count || other->getChildrenCount() != otherCount) return false;
+                for (int i = 0; i < count; ++i) {
+                    auto tile = static_cast<CCSprite*>(selected->getChildren()->objectAtIndex(i));
+                    if (tile->getTexture() != selected->getTexture() || tile->getAnchorPoint() != CCPoint{0.f, 0.f} ||
+                        tile->getPosition() != CCPoint{i * tile->getContentSize().width, 0.f}) return false;
+                }
+            }
+        }
+        layer->m_ground2Sprite = nullptr;
+        layer->loadGroundSprites(5, false);
+        return first->getChildrenCount() == 3 && second->getChildrenCount() == 3;
+    });
+
+    runBindingTest("Native enter easing buffers and cache", [] {
+        return withNativeEditor(true, [](LevelEditorLayer* editor) {
+            if (offsetof(GJBaseGameLayer, m_enterEasingValues) != 0x3100 ||
+                offsetof(GJBaseGameLayer, m_enterEasingIndices) != 0x3118 ||
+                offsetof(GJBaseGameLayer, m_enterEasingValuesIndex) != 0x3158) return false;
+            auto& values = editor->m_enterEasingValues;
+            auto& indices = editor->m_enterEasingIndices;
+            values.clear();
+            indices.clear();
+            editor->m_enterEasingValuesIndex = 0;
+            if (editor->generateEnterEasingBuffer(0, 2.f) != -1) return false;
+            for (int type : {3, 7, 8, 9}) {
+                if (editor->generateEnterEasingBuffer(type, 2.f) != -2) return false;
+            }
+            if (editor->generateEnterEasingBuffer(1, -200.f) != -10000 ||
+                !values.empty() || !indices.empty() || editor->m_enterEasingValuesIndex != 0) return false;
+            int expectedIndex = 0;
+            for (int type = 1; type <= 18; ++type) {
+                if (type == 3 || type == 7 || type == 8 || type == 9) continue;
+                for (float rate : {2.f, 3.f}) {
+                    auto index = editor->generateEnterEasingBuffer(type, rate);
+                    if (index != expectedIndex || indices.at(type * 10000 + int(rate * 100.f)) != index ||
+                        values.size() != index + 101 || editor->m_enterEasingValuesIndex != index + 101) return false;
+                    for (int sample = 0; sample <= 100; ++sample) {
+                        auto expected = GameToolbox::getEasedValue(sample / 100.f, type, rate);
+                        if (std::abs(values[index + sample] - expected) > 0.00001f) return false;
+                    }
+                    auto count = indices.size();
+                    if (editor->generateEnterEasingBuffer(type, rate) != index ||
+                        editor->generateEnterEasingBuffer(type, rate + 0.001f) != index ||
+                        values.size() != index + 101 || indices.size() != count ||
+                        editor->m_enterEasingValuesIndex != index + 101) return false;
+                    expectedIndex += 101;
+                }
+            }
+            return values.size() == expectedIndex;
+        });
+    });
+
+    runBindingTest("SDK enter easing buffer regeneration", [] {
+        return withNativeEditor(true, [](LevelEditorLayer* editor) {
+            auto objects = CCArray::create();
+            AlphaTestField objectState(editor->m_objects, objects);
+            auto first = EnterEffectObject::create("infoIcon_001.png");
+            auto second = EnterEffectObject::create("infoIcon_001.png");
+            auto excluded = EnterEffectObject::create("infoIcon_001.png");
+            if (!first || !second || !excluded) return false;
+            first->m_objectID = 3006;
+            second->m_objectID = 3021;
+            excluded->m_objectID = 3016;
+            for (auto object : {first, second, excluded}) {
+                object->m_easingInType = static_cast<EasingType>(1);
+                object->m_easingInRate = 2.f;
+                object->m_easingOutType = static_cast<EasingType>(2);
+                object->m_easingOutRate = 3.f;
+                object->m_easingInBuffer = object->m_easingOutBuffer = 717171;
+                objects->addObject(object);
+            }
+            // The SDK helpers must share the native cache and discard stale entries.
+            editor->generateEnterEasingBuffer(4, 2.f);
+            editor->generateEnterEasingBuffers(first);
+            if (first->m_easingInBuffer != 101 || first->m_easingOutBuffer != 202) return false;
+            editor->regenerateEnterEasingBuffers();
+            if (editor->m_enterEasingIndices.size() != 2 || editor->m_enterEasingValues.size() != 202 ||
+                editor->m_enterEasingValuesIndex != 202) return false;
+            for (auto object : {first, second}) {
+                if (object->m_easingInBuffer != 0 || object->m_easingOutBuffer != 101) return false;
+            }
+            if (excluded->m_easingInBuffer != 717171 || excluded->m_easingOutBuffer != 717171) return false;
+            first->m_easingInType = EasingType::None;
+            first->m_easingOutType = static_cast<EasingType>(3);
+            objects->removeObject(second);
+            editor->regenerateEnterEasingBuffers();
+            return first->m_easingInBuffer == -1 && first->m_easingOutBuffer == -2 &&
+                editor->m_enterEasingIndices.empty() && editor->m_enterEasingValues.empty() &&
+                editor->m_enterEasingValuesIndex == 0;
+        });
     });
 
     runBindingTest("Native custom enter effect registration", [] {

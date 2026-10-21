@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 27 Windows address placeholders are in
+respective modules. The remaining 24 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,482 populated native wrappers, all pointing into executable sections of
+5,484 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -43,6 +43,17 @@ replacing a sole effect reproduced an access violation at 0x359f62. The
 Windows loader removes replaced entries before the native function runs,
 retaining native initialization and same-object refresh. Regression fixtures
 cover this crash, selective removal, enter/exit isolation and invalid channels.
+The enter-easing buffer generator at 0x314ac0 shares the native value vector,
+index map and sample counter at 0x3100/0x3118/0x3158. Fixtures compare all 101
+samples for each buffered easing type at two rates against the native easing
+helper, verify sentinel results and cache reuse, and exercise SDK regeneration
+with included/excluded enter-object IDs and stale cached entries.
+GJMGLayer::init at 0x387b80 initializes both middleground sprite batches;
+loadGroundSprites at 0x3880b0 independently grows and shrinks their tile lists.
+Fixtures cover all three native middleground indices, tile positions, texture
+identity, repeated resizing and a missing optional second sprite. A guarded
+constructor/destructor fixture checks the 0x1e8 allocation. Its scalar deleting
+destructor at 0x386c60 now receives explicit deletion flags zero.
 Native updateExtraGameLayers at 0x32b500 copies position and both scale axes.
 GJUINode::create now uses 0x673b50, whose native allocation is 0x188; the old
 0x66d6e0 address created an unrelated 0x160-byte node. The 0x674070 position
@@ -119,7 +130,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-136 checks cover native constructors, level/list cache fixtures, fresh/expired
+141 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
