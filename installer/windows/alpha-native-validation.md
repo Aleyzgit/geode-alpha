@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 34 Windows address placeholders are in
+respective modules. The remaining 30 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,473 populated native wrappers, all pointing into executable sections of
+5,478 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -49,6 +49,21 @@ GJUINode::create now uses 0x673b50, whose native allocation is 0x188; the old
 helper is tested for scale/radius changes, alternate mode and a missing second
 button. Alternate mode centers the first sprite at the native zero point.
 
+GJOptionsLayer::countForPage at 0x39b760 reads m_values at 0x408; the previously
+unimplemented increment helper is 0x39b850. Video and parental option pages
+share 0x4cfb00, reading m_values at 0x2a8. Fixtures cover absent, signed,
+malformed and independent page keys and increment through the SDK/native path.
+Both SDK option constructors now initialize dictionary and button pointers.
+Before that correction, exception cleanup in MoreVideoOptionsLayer released an
+uninitialized m_variables pointer and crashed in CCObject::release. Guarded
+construction/destruction fixtures verify initialization and balanced releases.
+GameStatsManager::trySelectActivePath uses 0x2da5f0 and m_activePath at 0x3e4.
+Temporary store, purchase and chest dictionaries and dictionary-mode statistics
+isolate the fixture from real progression. It checks locked paths, preservation
+of an unfinished selected path, replacement of completed paths, the 999/1000
+completion boundary and no remaining eligible path. All manager fields are
+restored before the private profile is saved.
+
 The updated upstream declarations include the current gameplay-layer state
 and additional editor-window functions. Removed Windows classes such as
 EditorOptionsLayer, GameOptionsLayer and GJWriteMessagePopup are marked missing.
@@ -68,7 +83,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-123 checks cover native constructors, level/list cache fixtures, fresh/expired
+129 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore

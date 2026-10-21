@@ -69,6 +69,32 @@ alpha_patch_address(GeometryDash GJUINode
     "static GJUINode* create(UIButtonConfig& config)" 0x673b50 0x66d6e0)
 alpha_patch_address(GeometryDash GJUINode "void updateButtonPositions()" 0x674070)
 
+# GJOptionsLayer's toggle builder increments its page count through this
+# routine. The older SDK declaration had no Windows implementation at all.
+alpha_patch_class(GeometryDash GJOptionsLayer "    void incrementCountForPage(int page);"
+    "    void incrementCountForPage(int page) = win 0x39b850;")
+alpha_patch_address(GeometryDash GJOptionsLayer "int countForPage(int page)" 0x39b760)
+# Video and parental options share the native dictionary-count helper at
+# 0x4cfb00, reading m_values at 0x2a8. Their page keys use page_%i.
+foreach(class IN ITEMS MoreVideoOptionsLayer ParentalOptionsLayer)
+    alpha_patch_address(GeometryDash "${class}" "int countForPage(int page)" 0x4cfb00)
+endforeach()
+alpha_patch_address(GeometryDash GameStatsManager "void trySelectActivePath()" 0x2da5f0)
+foreach(class IN ITEMS MoreVideoOptionsLayer ParentalOptionsLayer)
+    set(alpha_options_inline "${alpha_bindings_output}/inline/${class}.cpp")
+    file(READ "${alpha_options_inline}" alpha_options_content)
+    set(alpha_options_constructor "${class}::${class}() {\n")
+    string(FIND "${alpha_options_content}" "${alpha_options_constructor}" alpha_options_match)
+    if (alpha_options_match LESS 0)
+        message(FATAL_ERROR "Unexpected ${class} constructor implementation")
+    endif()
+    # Failed initialization must not release uninitialized dictionary pointers.
+    string(REPLACE "${alpha_options_constructor}"
+        "${alpha_options_constructor}    m_values = nullptr;\n    m_variables = nullptr;\n    m_prevButton = nullptr;\n    m_nextButton = nullptr;\n"
+        alpha_options_content "${alpha_options_content}")
+    file(CONFIGURE OUTPUT "${alpha_options_inline}" CONTENT "${alpha_options_content}" @ONLY)
+endforeach()
+
 # Shader split targets are doubles: native tween actions 45/46 write 0x2b0
 # and 0x2b8. The flags follow at 0x2c0; construction reserves 0x2d0.
 alpha_patch_class(GeometryDash GJShaderState

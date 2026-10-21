@@ -36,6 +36,7 @@
 #include <Geode/binding/GJRequestCell.hpp>
 #include <Geode/binding/GJRewardItem.hpp>
 #include <Geode/binding/GJSpriteColor.hpp>
+#include <Geode/binding/GJStoreItem.hpp>
 #include <Geode/binding/GJShaderState.hpp>
 #include <Geode/binding/GJUINode.hpp>
 #include <Geode/binding/GJUserScore.hpp>
@@ -50,6 +51,7 @@
 #include <Geode/binding/MusicDownloadManager.hpp>
 #include <Geode/binding/MusicBrowser.hpp>
 #include <Geode/binding/MusicSearchResult.hpp>
+#include <Geode/binding/MoreVideoOptionsLayer.hpp>
 #include <Geode/binding/NewgroundsInfoLayer.hpp>
 #include <Geode/binding/NumberInputLayer.hpp>
 #include <Geode/binding/NumberInputDelegate.hpp>
@@ -58,6 +60,7 @@
 #include <Geode/binding/OptionsObjectDelegate.hpp>
 #include <Geode/binding/OptionsScrollLayer.hpp>
 #include <Geode/binding/ParentalGateLayer.hpp>
+#include <Geode/binding/ParentalOptionsLayer.hpp>
 #include <Geode/binding/OBB2D.hpp>
 #include <Geode/binding/PulseEffectAction.hpp>
 #include <Geode/binding/PagedListPopup.hpp>
@@ -362,6 +365,46 @@ namespace {
             local->m_localLevels->removeAllObjects();
         }
         return valid && !manager->m_levelEditorLayer;
+    }
+
+    template <class Layer>
+    bool checkOptionPageCounts(size_t valuesOffset) {
+        auto popup = std::make_unique<Layer>();
+        if (reinterpret_cast<uint8_t*>(&popup->m_values) - reinterpret_cast<uint8_t*>(popup.get()) != valuesOffset) {
+            return false;
+        }
+        AlphaTestField values(popup->m_values, CCDictionary::create());
+        auto counts = popup->m_values;
+        counts->setObject(CCString::create("17"), "page_3");
+        counts->setObject(CCString::create("-2"), "page_-7");
+        counts->setObject(CCString::create("44"), "alpha-sentinel");
+        if (popup->countForPage(3) != 17 || popup->countForPage(-7) != -2 ||
+            popup->countForPage(123456789) != 0 || counts->count() != 3) return false;
+        popup->incrementCountForPage(3);
+        popup->incrementCountForPage(-7);
+        if (popup->countForPage(3) != 18 || popup->countForPage(-7) != -1 ||
+            counts->valueForKey("alpha-sentinel")->intValue() != 44 || counts->count() != 3) return false;
+        counts->setObject(CCString::create("invalid"), "page_3");
+        return popup->countForPage(3) == 0 && counts->count() == 3;
+    }
+
+    template <class Layer>
+    bool checkOptionConstruction() {
+        alignas(Layer) std::array<uint8_t, sizeof(Layer) + 32> storage;
+        storage.fill(0xa5);
+        auto popup = new (storage.data()) Layer();
+        auto initialized = !popup->m_values && !popup->m_variables &&
+            !popup->m_prevButton && !popup->m_nextButton;
+        auto values = CCDictionary::create();
+        auto variables = CCDictionary::create();
+        values->retain();
+        variables->retain();
+        popup->m_values = values;
+        popup->m_variables = variables;
+        popup->~Layer();
+        return initialized && values->retainCount() == 1 && variables->retainCount() == 1 &&
+            std::all_of(storage.begin() + sizeof(Layer), storage.end(),
+                [](uint8_t byte) { return byte == 0xa5; });
     }
 
     template <class F>
@@ -1184,6 +1227,66 @@ $on_game(Loaded) {
             !stats->m_completedLevels->objectForKey("demon_717171") &&
             stats->m_completedLevels->objectForKey("alpha-preserve") == value &&
             stats->getPathRewardKey(23) == "pr_23";
+    });
+
+    runBindingTest("Native active path selection", [] {
+        auto manager = GameStatsManager::sharedState();
+        if (offsetof(GameStatsManager, m_activePath) != 0x3e4 || sizeof(GJStoreItem) != 0x178) return false;
+        AlphaTestField store(manager->m_allStoreItems, CCDictionary::create());
+        AlphaTestField chestItems(manager->m_allTreasureRoomChestItems, CCDictionary::create());
+        AlphaTestField specialItems(manager->m_allSpecialChestItems, CCDictionary::create());
+        AlphaTestField purchased(manager->m_purchasedItems, CCDictionary::create());
+        AlphaTestField stats(manager->m_playerStats, CCDictionary::create());
+        AlphaTestField dictionaryStats(manager->m_usePlayerStatsCCDictionary, true);
+        AlphaTestField active(manager->m_activePath, 42);
+        manager->trySelectActivePath();
+        if (manager->m_activePath != 0) return false;
+        for (int path : {30, 31, 39}) {
+            auto item = GJStoreItem::create(717171 + path, path - 24, 12, 0, ShopType::Normal);
+            if (!item) return false;
+            manager->m_allStoreItems->setObject(item, manager->getItemKey(path - 24, 12));
+        }
+        if (manager->isItemUnlocked(UnlockType::GJItem, 6)) return false;
+        manager->m_purchasedItems->setObject(CCString::create("1"), "717201");
+        manager->m_purchasedItems->setObject(CCString::create("1"), "717202");
+        if (!manager->isItemUnlocked(UnlockType::GJItem, 6) ||
+            !manager->isItemUnlocked(UnlockType::GJItem, 7)) return false;
+        manager->m_activePath = 31;
+        manager->trySelectActivePath();
+        if (manager->m_activePath != 31) return false;
+        manager->m_playerStats->setObject(CCString::create("1000"), "31");
+        manager->trySelectActivePath();
+        if (manager->m_activePath != 30) return false;
+        manager->m_playerStats->setObject(CCString::create("1000"), "30");
+        manager->trySelectActivePath();
+        if (manager->m_activePath != 0) return false;
+        manager->m_purchasedItems->setObject(CCString::create("1"), "717210");
+        manager->m_playerStats->setObject(CCString::create("999"), "39");
+        manager->trySelectActivePath();
+        if (manager->m_activePath != 39) return false;
+        manager->m_playerStats->setObject(CCString::create("1000"), "39");
+        manager->trySelectActivePath();
+        return manager->m_activePath == 0;
+    });
+
+    runBindingTest("Native video option construction", [] {
+        return checkOptionConstruction<MoreVideoOptionsLayer>();
+    });
+
+    runBindingTest("Native parental option construction", [] {
+        return checkOptionConstruction<ParentalOptionsLayer>();
+    });
+
+    runBindingTest("Native option page counts", [] {
+        return checkOptionPageCounts<GJOptionsLayer>(0x408);
+    });
+
+    runBindingTest("Native video page counts", [] {
+        return checkOptionPageCounts<MoreVideoOptionsLayer>(0x2a8);
+    });
+
+    runBindingTest("Native parental option page counts", [] {
+        return checkOptionPageCounts<ParentalOptionsLayer>(0x2a8);
     });
 
     runBindingTest("Native options containers", [] {
