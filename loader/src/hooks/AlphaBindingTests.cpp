@@ -45,6 +45,10 @@
 #include <Geode/binding/NewgroundsInfoLayer.hpp>
 #include <Geode/binding/NumberInputLayer.hpp>
 #include <Geode/binding/NumberInputDelegate.hpp>
+#include <Geode/binding/OptionsCell.hpp>
+#include <Geode/binding/OptionsObject.hpp>
+#include <Geode/binding/OptionsObjectDelegate.hpp>
+#include <Geode/binding/OptionsScrollLayer.hpp>
 #include <Geode/binding/ParentalGateLayer.hpp>
 #include <Geode/binding/OBB2D.hpp>
 #include <Geode/binding/PulseEffectAction.hpp>
@@ -96,6 +100,30 @@ static_assert(std::is_abstract_v<CCKeyboardActionManager>);
 static_assert(std::is_abstract_v<EditorWindowPopup>);
 static_assert(std::is_abstract_v<ScrollViewPopup>);
 namespace {
+    class AlphaOptionsReceiver final : public OptionsObjectDelegate {
+    public:
+        unsigned changes = 0;
+        OptionsObject* last = nullptr;
+        void stateChanged(OptionsObject* value) override {
+            ++changes;
+            last = value;
+        }
+    };
+
+    OptionsCell* findOptionsRow(CCNode* node, OptionsObject* option) {
+        if (auto row = typeinfo_cast<OptionsCell*>(node); row && row->m_optionsObject == option) {
+            return row;
+        }
+        if (auto children = node->getChildren()) {
+            for (unsigned index = 0; index < children->count(); ++index) {
+                if (auto row = findOptionsRow(static_cast<CCNode*>(children->objectAtIndex(index)), option)) {
+                    return row;
+                }
+            }
+        }
+        return nullptr;
+    }
+
     class AlphaModalFixture final : public geode::Popup {
     public:
         bool initialize() { return Popup::init(120.f, 80.f); }
@@ -1450,6 +1478,129 @@ $on_game(Loaded) {
         effects.reset();
         return valid && std::all_of(storage.begin() + sizeof(GJEffectManager), storage.end(),
             [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native options data and popup layouts", [] {
+        return sizeof(OptionsObject) == 0x78 && offsetof(OptionsObject, m_count) == 0x6c &&
+            sizeof(OptionsScrollLayer) == 0x300;
+    });
+
+    runBindingTest("Native options factory and row", [] {
+        if (sizeof(OptionsObject) != 0x78 || offsetof(OptionsObject, m_count) != 0x6c ||
+            sizeof(OptionsScrollLayer) != 0x300) return false;
+        AlphaOptionsReceiver receiver;
+        auto pool = CCPoolManager::sharedPoolManager();
+        pool->push();
+        auto pop = [](CCPoolManager* value) { value->pop(); };
+        std::unique_ptr<CCPoolManager, decltype(pop)> scope(pool, pop);
+        std::string title(96, 'a');
+        auto option = OptionsObject::create(717171, false, title, &receiver);
+        if (!option || option->m_optionID != 717171 || option->m_enabled ||
+            option->m_name != title || option->m_delegate != &receiver || option->m_count != 0) {
+            return false;
+        }
+        option->m_count = 7;
+        auto options = CCArray::create();
+        options->addObject(option);
+        auto popup = OptionsScrollLayer::create(options, false, "Alpha options fixture", nullptr);
+        if (!popup || popup->m_optionObjects != options || !popup->m_listLayer) return false;
+        Ref<OptionsCell> row = findOptionsRow(popup, option);
+        if (!row) return false;
+        row->onToggleOption(nullptr);
+        bool toggled = option->m_enabled && receiver.changes == 1 && receiver.last == option;
+        popup->onClearAll(nullptr);
+        bool cleared = !option->m_enabled && receiver.changes == 2 && receiver.last == option;
+        popup->onClearAll(nullptr);
+        popup->onMatchToggle(nullptr);
+        cleared = cleared && receiver.changes == 2;
+        popup->onClose(nullptr);
+        return toggled && cleared && !popup->m_listLayer;
+    });
+
+    runBindingTest("Native options SDK construction", [] {
+        alignas(OptionsObject) std::array<uint8_t, sizeof(OptionsObject) + 32> objectStorage;
+        objectStorage.fill(0xa5);
+        auto option = new (objectStorage.data()) OptionsObject();
+        bool valid = !option->m_enabled && !option->m_delegate && option->m_count == 0 &&
+            option->m_name.empty();
+        option->m_name.assign(128, 'a');
+        option->OptionsObject::~OptionsObject();
+        valid = valid && std::all_of(objectStorage.begin() + sizeof(OptionsObject), objectStorage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
+        alignas(OptionsScrollLayer) std::array<uint8_t, sizeof(OptionsScrollLayer) + 32> popupStorage;
+        popupStorage.fill(0xa5);
+        auto popup = new (popupStorage.data()) OptionsScrollLayer();
+        valid = valid && !popup->m_optionObjects && !popup->m_listLayer &&
+            !popup->m_searchInput && popup->m_searchQuery.empty() && !popup->m_searchResult;
+        popup->m_searchQuery.assign(128, 'b');
+        popup->OptionsScrollLayer::~OptionsScrollLayer();
+        valid = valid && std::all_of(popupStorage.begin() + sizeof(OptionsScrollLayer), popupStorage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
+        auto rowOption = std::make_unique<OptionsObject>();
+        rowOption->m_name = "Alpha SDK row fixture";
+        rowOption->m_count = 7;
+        alignas(OptionsCell) std::array<uint8_t, sizeof(OptionsCell) + 32> rowStorage;
+        rowStorage.fill(0xa5);
+        auto row = new (rowStorage.data()) OptionsCell("alpha-options-fixture", 320.f, 40.f);
+        row->loadFromObject(rowOption.get());
+        valid = valid && row->m_optionsObject == rowOption.get() && row->getChildrenCount() > 0;
+        row->OptionsCell::~OptionsCell();
+        return valid && std::all_of(rowStorage.begin() + sizeof(OptionsCell), rowStorage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native options search filters", [] {
+        auto pool = CCPoolManager::sharedPoolManager();
+        pool->push();
+        auto pop = [](CCPoolManager* value) { value->pop(); };
+        std::unique_ptr<CCPoolManager, decltype(pop)> scope(pool, pop);
+        auto first = OptionsObject::create(1, false, "Alpha positive", nullptr);
+        auto second = OptionsObject::create(2, false, "Beta zero", nullptr);
+        auto third = OptionsObject::create(3, true, "Alpha enabled", nullptr);
+        if (!first || !second || !third) return false;
+        first->m_count = 3;
+        auto options = CCArray::create();
+        for (auto option : {first, second, third}) options->addObject(option);
+        auto popup = std::make_unique<OptionsScrollLayer>();
+        auto selected = popup->getRelevantObjects(options);
+        if (!selected || selected->count() != 2 || selected->objectAtIndex(0) != first ||
+            selected->objectAtIndex(1) != third) return false;
+        popup->m_searchQuery = "BETA";
+        selected = popup->getRelevantObjects(options);
+        if (selected->count() != 1 || selected->objectAtIndex(0) != second ||
+            popup->m_searchQuery != "BETA") return false;
+        popup->m_searchQuery.assign(128, 'z');
+        return popup->getRelevantObjects(options)->count() == 0 &&
+            popup->getRelevantObjects(nullptr)->count() == 0 && options->count() == 3;
+    });
+
+    runBindingTest("Native options SDK initialization", [] {
+        auto pool = CCPoolManager::sharedPoolManager();
+        pool->push();
+        auto pop = [](CCPoolManager* value) { value->pop(); };
+        std::unique_ptr<CCPoolManager, decltype(pop)> scope(pool, pop);
+        auto option = OptionsObject::create(1, false, "Beta fixture", nullptr);
+        if (!option) return false;
+        option->m_count = 4;
+        auto options = CCArray::create();
+        options->addObject(option);
+        auto popup = std::make_unique<OptionsScrollLayer>();
+        if (!popup->init(options, false, "Alpha options SDK fixture", nullptr) ||
+            popup->m_optionObjects != options || !popup->m_searchInput ||
+            !popup->m_searchBackground || !popup->m_clearSearchButton || !popup->m_listLayer) {
+            return false;
+        }
+        popup->m_searchInput->setString("BETA");
+        popup->textChanged(popup->m_searchInput);
+        auto selected = popup->getRelevantObjects(options);
+        bool filtered = popup->m_searchQuery == "BETA" && selected->count() == 1 &&
+            selected->objectAtIndex(0) == option;
+        popup->onClearSearchText(nullptr);
+        bool cleared = popup->m_searchInput->getString().empty();
+        popup->textChanged(popup->m_searchInput);
+        cleared = cleared && popup->m_searchQuery.empty();
+        popup->onClose(nullptr);
+        return filtered && cleared && !popup->m_listLayer;
     });
 }
 #ifdef __clang__

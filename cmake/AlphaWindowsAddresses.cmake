@@ -816,10 +816,99 @@ if (WIN32)
         alpha_patch_class(GeometryDash "${class}"
             "~${class}() = win ${address}" "~${class}() = win inline")
         set(alpha_destructor_source "#include <Geode/binding/${class}.hpp>\n#include <Geode/modify/Traits.hpp>\n\n#ifdef GEODE_IS_WINDOWS\n${class}::~${class}() {\n    if (!geode::DestructorLock::isLocked(this)) {\n        using FunctionType = void(*)(${class}*, unsigned int);\n        reinterpret_cast<FunctionType>(geode::base::get() + ${address})(this, 0);\n        new (this) ${class}(geode::CutoffConstructor, sizeof(${class}));\n        geode::DestructorLock::addLock(this);\n    }\n}\n#endif\n")
-        file(WRITE "${alpha_bindings_output}/inline/${class}.cpp" "${alpha_destructor_source}")
+        set(alpha_destructor_existing "")
+        if (EXISTS "${alpha_bindings_source}/inline/${class}.cpp")
+            file(READ "${alpha_bindings_output}/inline/${class}.cpp" alpha_destructor_existing)
+        endif()
+        file(WRITE "${alpha_bindings_output}/inline/${class}.cpp"
+            "${alpha_destructor_existing}\n${alpha_destructor_source}")
     endfunction()
     alpha_patch_deleting_destructor(TabbedPopupLayer 0x19cd00)
     alpha_patch_deleting_destructor(GameSettingsLayer 0x2c2530)
+endif()
+
+# Options factories allocate 0x78 and 0x300. The native row reads its count at
+# 0x6c; filtering uses the popup's search string at 0x2d0, not a minimum count.
+alpha_patch_address(GeometryDash OptionsObject
+    "static OptionsObject* create(int id, bool enabled, std::string name, OptionsObjectDelegate* delegate)" 0x3a99e0)
+alpha_patch_address(GeometryDash OptionsScrollLayer
+    "void onClose(cocos2d::CCObject* sender)" 0x47f2d0)
+if (WIN32)
+    alpha_patch_class(GeometryDash OptionsObject
+        "    virtual ~OptionsObject() = win 0x399c70;"
+        "    OptionsObject() = win inline;\n    virtual ~OptionsObject() = win inline;")
+    alpha_patch_class(GeometryDash OptionsObject
+        "    int m_count;" "    int m_unk68;\n    int m_count;\n    PAD = win 0x8;")
+    file(APPEND "${alpha_bindings_output}/inline/OptionsObject.cpp"
+        "\n#ifdef GEODE_IS_WINDOWS\nOptionsObject::OptionsObject() : m_optionID(0), m_enabled(false), m_delegate(nullptr), m_unk68(0), m_count(0) {\n    std::memset(reinterpret_cast<unsigned char*>(this) + 0x70, 0, 8);\n}\nOptionsObject::~OptionsObject() {}\n#endif\n")
+
+    alpha_patch_class(GeometryDash OptionsScrollLayer
+        "    virtual ~OptionsScrollLayer()"
+        "    OptionsScrollLayer() = win inline;\n    virtual ~OptionsScrollLayer()")
+    alpha_patch_class(GeometryDash OptionsScrollLayer
+        "static OptionsScrollLayer* create(cocos2d::CCArray*, bool, std::string, MusicSearchResult*) = m1"
+        "static OptionsScrollLayer* create(cocos2d::CCArray*, bool, std::string, MusicSearchResult*) = win 0x47e380, m1")
+    alpha_patch_class(GeometryDash OptionsScrollLayer
+        "bool init(cocos2d::CCArray*, bool, std::string, MusicSearchResult*) = win inline"
+        "bool init(cocos2d::CCArray*, bool, std::string, MusicSearchResult*) = win 0x47e520")
+    alpha_patch_class(GeometryDash OptionsScrollLayer
+        "cocos2d::CCArray* getRelevantObjects(cocos2d::CCArray* objects) = win inline;"
+        "cocos2d::CCArray* getRelevantObjects(cocos2d::CCArray* objects) = win 0x47f400;")
+    alpha_patch_class(GeometryDash OptionsScrollLayer
+        "void onClearAll(cocos2d::CCObject* sender);"
+        "void onClearAll(cocos2d::CCObject* sender) = win 0x47eef0;")
+    alpha_patch_class(GeometryDash OptionsScrollLayer
+        "void onClearSearchText(cocos2d::CCObject* sender);"
+        "void onClearSearchText(cocos2d::CCObject* sender) = win 0x47efa0;")
+    alpha_patch_class(GeometryDash OptionsScrollLayer
+        "void onMatchToggle(cocos2d::CCObject* sender);"
+        "void onMatchToggle(cocos2d::CCObject* sender) = win 0x47ee60;")
+    alpha_patch_class(GeometryDash OptionsScrollLayer
+        "    int m_minCount;"
+        "    PAD = win 0x4;\n    CCTextInputNode* m_searchInput;\n    cocos2d::extension::CCScale9Sprite* m_searchBackground;\n    CCMenuItemSpriteExtra* m_clearSearchButton;\n    std::string m_searchQuery;\n    CCMenuItemSpriteExtra* m_matchButton;\n    MusicSearchResult* m_searchResult;")
+    set(alpha_options_inline "${alpha_bindings_output}/inline/OptionsScrollLayer.cpp")
+    file(READ "${alpha_options_inline}" alpha_options_content)
+    set(alpha_options_filter [=[cocos2d::CCArray* OptionsScrollLayer::getRelevantObjects(cocos2d::CCArray* objects) {
+    auto relevantObjects = cocos2d::CCArray::create();
+    for (auto object : geode::cocos::CCArrayExt<OptionsObject, false>(objects)) {
+        if (object->m_count > m_minCount || object->m_enabled) {
+            relevantObjects->addObject(object);
+        }
+    }
+    return relevantObjects;
+}]=])
+    set(alpha_options_init [=[// TODO: 2.209
+bool OptionsScrollLayer::init(cocos2d::CCArray* objects, bool recreate, std::string p0, MusicSearchResult* p1) {
+    if (!FLAlertLayer::init(150)) return false;
+    m_noElasticity = true;
+    m_recreateList = recreate;
+    // m_minCount = minimum;
+    if (objects) {
+        m_optionObjects = objects;
+        objects->retain();
+    }
+    auto winSize = cocos2d::CCDirector::sharedDirector()->getWinSize();
+    m_buttonMenu = cocos2d::CCMenu::create();
+    m_mainLayer->addChild(m_buttonMenu, 10);
+    m_joystickConnected = -1;
+    auto closeButton = CCMenuItemSpriteExtra::create(cocos2d::CCSprite::createWithSpriteFrameName("GJ_closeBtn_001.png"), this, menu_selector(OptionsScrollLayer::onClose));
+    closeButton->setSizeMult(1.6f);
+    closeButton->setPosition(m_buttonMenu->convertToNodeSpace(winSize * .5f + cocos2d::CCPoint { -210.f, 135.f }));
+    this->setupList(m_optionObjects);
+    return true;
+}]=])
+    foreach(body IN ITEMS "${alpha_options_filter}" "${alpha_options_init}")
+        string(FIND "${alpha_options_content}" "${body}" alpha_options_match)
+        if (alpha_options_match LESS 0)
+            message(FATAL_ERROR "Unexpected OptionsScrollLayer inline implementation")
+        endif()
+        string(REPLACE "${body}" "" alpha_options_content "${alpha_options_content}")
+    endforeach()
+    file(CONFIGURE OUTPUT "${alpha_options_inline}" CONTENT "${alpha_options_content}" @ONLY)
+    file(APPEND "${alpha_options_inline}"
+        "\n#ifdef GEODE_IS_WINDOWS\nOptionsScrollLayer::OptionsScrollLayer() : m_optionObjects(nullptr), m_listLayer(nullptr), m_recreateList(false), m_searchInput(nullptr), m_searchBackground(nullptr), m_clearSearchButton(nullptr), m_matchButton(nullptr), m_searchResult(nullptr) {}\n#endif\n")
+    alpha_patch_deleting_destructor(OptionsScrollLayer 0x47a040)
+    alpha_patch_deleting_destructor(OptionsCell 0x151070)
 endif()
 
 # Native list-row actions call the reorder function directly; coder loading

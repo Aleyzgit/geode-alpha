@@ -103,7 +103,12 @@ $expected = @(
     'Native arithmetic gate SDK construction',
     'Native effect manager layout',
     'Native triggered ID removal',
-    'Native effect manager SDK construction'
+    'Native effect manager SDK construction',
+    'Native options data and popup layouts',
+    'Native options factory and row',
+    'Native options SDK construction',
+    'Native options search filters',
+    'Native options SDK initialization'
 )
 
 foreach ($mode in @('Strict', 'Experimental')) {
