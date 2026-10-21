@@ -140,6 +140,8 @@ $expected = @(
     'Native keybinding popup construction',
     'Native browser page and folder labels',
     'SDK profile construction boundary',
+    'SDK time speed control allocation',
+    'Native time speed controls and audio toggle',
     'Native pause construction boundary and ownership',
     'Native pause queued start position lookup',
     'Native quest availability and pause badge',

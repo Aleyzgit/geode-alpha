@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,496 populated native wrappers, all pointing into executable sections of
+5,499 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -148,6 +148,16 @@ slots 1 through 3. PauseLayer's quest-status helper is inlined in native setup;
 the SDK recreates its badge with tag 99, Z order 10, scale 0.3 and position
 (6, 22). A fixture isolates challenges and verifies each slot, badge replacement,
 removal and preservation of unrelated children. No quest is collected.
+TimeSpeedControl reserves 0x160 bytes, with the game layer, slider, label and
+audio toggle at 0x140/0x148/0x150/0x158. Its factory/initializer use
+0x66d6e0/0x66d790, and the SDK constructor initializes all four pointers.
+The scalar deleting destructor at 0x47080 receives explicit deletion flags zero.
+Native slider/audio callbacks at 0x66dc50/0x66ddd0 write the gameplay and audio
+speed floats at game-layer offsets 0x3560/0x3564. The latter field replaces
+previous alignment padding without moving later fields. A fresh editor fixture
+activates the real thumb/toggle controls, checks one-decimal speed rounding and
+label text, audio-speed independence and SDK construction/initialization.
+The 0183 preference dictionary is isolated and no real level is modified.
 LevelTools::posForTimeInternal at 0x4676d0 has seven native arguments. The old
 eight-argument SDK overload forwards to it without the unused tail argument;
 the seven-argument overload provides the actual hook signature. Empty/null
@@ -193,7 +203,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-157 checks cover native constructors, level/list cache fixtures, fresh/expired
+159 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -328,7 +338,7 @@ pointer fields and paged-popup storage are used without duplicate padding.
 TabbedPopupLayer's Windows tail remains the verified 0x48 bytes.
 
 A separate compiled-size comparison covers all 548 upstream Windows references.
-It reports 132 differences requiring native verification; these are not a list
+It reports 131 differences requiring native verification; these are not a list
 of proven defects because some reference sizes are inconsistent with native
 construction. For example, GameManager's fields start before the reference's
 claimed GManager size. No automatic padding is applied from this comparison.

@@ -94,6 +94,7 @@
 #include <Geode/binding/ScrollViewPopup.hpp>
 #include <Geode/binding/SetTextPopup.hpp>
 #include <Geode/binding/SetTextPopupDelegate.hpp>
+#include <Geode/binding/TimeSpeedControl.hpp>
 #include <Geode/binding/CCTextInputNode.hpp>
 #include <Geode/binding/VirtualRowSource.hpp>
 #include <Geode/binding/UserInfoDelegate.hpp>
@@ -2664,6 +2665,58 @@ $on_game(Loaded) {
                     channel != editor->m_gameState.m_rotateChannel) return false;
             }
             return affectedByPortals;
+        });
+    });
+
+    runBindingTest("SDK time speed control allocation", [] {
+        alignas(TimeSpeedControl) std::array<uint8_t, sizeof(TimeSpeedControl) + 32> storage;
+        storage.fill(0xa5);
+        auto control = new (storage.data()) TimeSpeedControl;
+        auto valid = sizeof(TimeSpeedControl) == 0x160 && offsetof(TimeSpeedControl, m_gameLayer) == 0x140 &&
+            offsetof(TimeSpeedControl, m_audioToggle) == 0x158 && !control->m_gameLayer &&
+            !control->m_slider && !control->m_label && !control->m_audioToggle;
+        control->~TimeSpeedControl();
+        return valid && std::all_of(storage.begin() + sizeof(TimeSpeedControl), storage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native time speed controls and audio toggle", [] {
+        return withNativeEditor(true, [](LevelEditorLayer* editor) {
+            if (offsetof(GJBaseGameLayer, m_unk3380) != 0x3560 ||
+                offsetof(GJBaseGameLayer, m_audioSpeed) != 0x3564) return false;
+            auto manager = GameManager::get();
+            AlphaTestField variables(manager->m_valueKeeper, CCDictionary::create());
+            editor->m_unk3380 = 1.3f;
+            editor->m_audioSpeed = 1.3f;
+            auto control = TimeSpeedControl::create(editor);
+            if (!control || control->m_gameLayer != editor || !control->m_slider || !control->m_label ||
+                !control->m_audioToggle || !control->m_audioToggle->isToggled() ||
+                std::string(control->m_label->getString()) != "1.3x" ||
+                std::abs(control->m_slider->getValue() - 1.2f / 1.9f) > .001f) return false;
+            for (float value : {0.f, .25f, .5f, 1.f}) {
+                control->m_slider->setValue(value);
+                auto thumb = control->m_slider->getThumb();
+                if (!thumb) return false;
+                thumb->activate();
+                auto speed = std::round((control->m_slider->getValue() * 1.9f + .1f) * 10.f) / 10.f;
+                auto label = fmt::format("{:.1f}x", speed);
+                if (std::abs(editor->m_unk3380 - speed) > .001f || editor->m_audioSpeed != editor->m_unk3380 ||
+                    std::string(control->m_label->getString()) != label) return false;
+                control->m_audioToggle->activate();
+                if (!manager->getGameVariable("0183") || editor->m_audioSpeed != 1.f ||
+                    control->m_audioToggle->isToggled()) return false;
+                control->timeSliderChanged(thumb);
+                if (editor->m_audioSpeed != 1.f) return false;
+                control->m_audioToggle->activate();
+                if (manager->getGameVariable("0183") || editor->m_audioSpeed != speed ||
+                    !control->m_audioToggle->isToggled()) return false;
+            }
+            control->onAudioTimeSpeedToggle(control->m_audioToggle);
+            if (!manager->getGameVariable("0183") || editor->m_audioSpeed != 1.f) return false;
+            auto sdkControl = std::make_unique<TimeSpeedControl>();
+            return sdkControl->init(editor) && sdkControl->m_gameLayer == editor &&
+                sdkControl->m_slider && sdkControl->m_label && sdkControl->m_audioToggle &&
+                !sdkControl->m_audioToggle->isToggled();
         });
     });
 

@@ -120,6 +120,23 @@ endif()
 string(REPLACE "${alpha_pause_old_constructor}" "" alpha_pause_content "${alpha_pause_content}")
 file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/PauseLayer.cpp" alpha_pause_constructor)
 file(WRITE "${alpha_pause_inline}" "${alpha_pause_content}\n${alpha_pause_constructor}")
+
+# The pause time-control factory allocates 0x160, with four child/state pointers
+# after CCNode. Native slider callbacks update gameplay and audio speed floats.
+alpha_patch_class(GeometryDash TimeSpeedControl "    virtual ~TimeSpeedControl()"
+    "    TimeSpeedControl() = win inline;\n    virtual ~TimeSpeedControl()")
+alpha_patch_class(GeometryDash TimeSpeedControl "    static TimeSpeedControl* create(GJBaseGameLayer*);"
+    "    static TimeSpeedControl* create(GJBaseGameLayer* layer) = win 0x66d6e0;")
+alpha_patch_class(GeometryDash TimeSpeedControl "    bool init(GJBaseGameLayer*);"
+    "    bool init(GJBaseGameLayer* layer) = win 0x66d790;")
+alpha_patch_class(GeometryDash TimeSpeedControl "    void onAudioTimeSpeedToggle(cocos2d::CCObject* sender);"
+    "    void onAudioTimeSpeedToggle(cocos2d::CCObject* sender) = win 0x66ddd0;")
+alpha_patch_class(GeometryDash TimeSpeedControl "    TodoReturn timeSliderChanged(cocos2d::CCObject*);"
+    "    void timeSliderChanged(cocos2d::CCObject* sender) = win 0x66dc50;\n\n    GJBaseGameLayer* m_gameLayer;\n    Slider* m_slider;\n    cocos2d::CCLabelBMFont* m_label;\n    CCMenuItemToggler* m_audioToggle;")
+alpha_patch_class(GeometryDash GJBaseGameLayer "    float m_unk3380;"
+    "    float m_unk3380;\n    win {\n    float m_audioSpeed;\n    }")
+file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/TimeSpeedControl.cpp" alpha_time_speed_constructor)
+file(APPEND "${alpha_bindings_output}/inline/TimeSpeedControl.cpp" "\n${alpha_time_speed_constructor}")
 # GameManager::recountUserStats inlines this 43-level set in Windows 2.2091.
 # Keep the SDK's owning return value instead of binding an interior address.
 alpha_patch_address(GeometryDash LevelTools "static std::unordered_set<int> getLevelList()" inline)
@@ -1153,6 +1170,7 @@ if (WIN32)
     alpha_patch_deleting_destructor(GJMGLayer 0x386c60)
     alpha_patch_deleting_destructor(FindObjectPopup 0x180260)
     alpha_patch_deleting_destructor(PauseLayer 0x4d6600)
+    alpha_patch_deleting_destructor(TimeSpeedControl 0x47080 PRESERVE_INLINE)
 endif()
 
 # Options factories allocate 0x78 and 0x300. The native row reads its count at
