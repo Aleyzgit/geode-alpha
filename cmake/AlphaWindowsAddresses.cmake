@@ -1,6 +1,10 @@
 # GD 2.2091 Windows, EXE SHA-256
 # 4eee06d5c2e2213b4ba2b1f6233dd426bbdd0e9b29d7c375e499516b6f8f69d5.
 # Match complete declarations inside their class, never method names globally.
+if (NOT WIN32)
+    return()
+endif()
+
 function(alpha_patch_class file class before after)
     set(path "${alpha_bindings_output}/${file}.bro")
     file(READ "${path}" content)

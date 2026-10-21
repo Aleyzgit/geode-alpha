@@ -1,4 +1,6 @@
 #include <Geode/utils/cocos.hpp>
+#include <Geode/cocos/actions/CCActionManager.h>
+#include <Geode/cocos/platform/CCEGLView.h>
 #include <Geode/loader/Dirs.hpp>
 #include <Geode/utils/file.hpp>
 #include <Geode/utils/web.hpp>
