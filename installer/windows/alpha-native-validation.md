@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 39 Windows address placeholders are in
+respective modules. The remaining 34 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,469 populated native wrappers, all pointing into executable sections of
+5,473 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -30,6 +30,24 @@ UIButtonConfig::resetOneBtn at 0x275970 restores the single-button size,
 position, opacity and flags, including after changing those settings.
 The newer NumberInputLayer fields are retained while its onDone virtual
 callback remains corrected to 0x4a1b10; 0x4a1820 handles digit input.
+
+GJShaderState reserves 0x2d0 bytes. Native tween actions 45 and 46 store doubles
+at 0x2b0 and 0x2b8, with flags following at 0x2c0. The SDK constructor initializes
+all 149 members without reconstructing already live unordered maps. A guarded
+fixture checks defaults, native split writes and the real tween-update path.
+EnterEffectInstance is 0xe8 bytes; its native add/remove methods at
+0x314490/0x3147c0 operate on the game-state channel maps. Effect IDs select
+replacement/removal, while unique ID and target/center groups select refresh.
+The game's replacement branch starts its move loop two elements past begin;
+replacing a sole effect reproduced an access violation at 0x359f62. The
+Windows loader removes replaced entries before the native function runs,
+retaining native initialization and same-object refresh. Regression fixtures
+cover this crash, selective removal, enter/exit isolation and invalid channels.
+Native updateExtraGameLayers at 0x32b500 copies position and both scale axes.
+GJUINode::create now uses 0x673b50, whose native allocation is 0x188; the old
+0x66d6e0 address created an unrelated 0x160-byte node. The 0x674070 position
+helper is tested for scale/radius changes, alternate mode and a missing second
+button. Alternate mode centers the first sprite at the native zero point.
 
 The updated upstream declarations include the current gameplay-layer state
 and additional editor-window functions. Removed Windows classes such as
@@ -50,7 +68,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-118 checks cover native constructors, level/list cache fixtures, fresh/expired
+123 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -185,7 +203,7 @@ pointer fields and paged-popup storage are used without duplicate padding.
 TabbedPopupLayer's Windows tail remains the verified 0x48 bytes.
 
 A separate compiled-size comparison covers all 548 upstream Windows references.
-It reports 136 differences requiring native verification; these are not a list
+It reports 135 differences requiring native verification; these are not a list
 of proven defects because some reference sizes are inconsistent with native
 construction. For example, GameManager's fields start before the reference's
 claimed GManager size. No automatic padding is applied from this comparison.

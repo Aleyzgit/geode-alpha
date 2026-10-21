@@ -14,6 +14,7 @@
 #include <Geode/binding/CustomSFXDelegate.hpp>
 #include <Geode/binding/EditorUI.hpp>
 #include <Geode/binding/EditorWindowPopup.hpp>
+#include <Geode/binding/EnterEffectObject.hpp>
 #include <Geode/binding/FMODAudioEngine.hpp>
 #include <Geode/binding/FriendPickerDelegate.hpp>
 #include <Geode/binding/IDNameBrowserDelegate.hpp>
@@ -35,6 +36,8 @@
 #include <Geode/binding/GJRequestCell.hpp>
 #include <Geode/binding/GJRewardItem.hpp>
 #include <Geode/binding/GJSpriteColor.hpp>
+#include <Geode/binding/GJShaderState.hpp>
+#include <Geode/binding/GJUINode.hpp>
 #include <Geode/binding/GJUserScore.hpp>
 #include <Geode/binding/LocalLevelManager.hpp>
 #include <Geode/binding/KeybindSet.hpp>
@@ -61,6 +64,7 @@
 #include <Geode/binding/PlayLayer.hpp>
 #include <Geode/binding/ReportQueuePopup.hpp>
 #include <Geode/binding/SFXBrowser.hpp>
+#include <Geode/binding/ShaderLayer.hpp>
 #include <Geode/binding/SongInfoObject.hpp>
 #include <Geode/binding/SpriteAnimationManager.hpp>
 #include <Geode/binding/ScrollViewPopup.hpp>
@@ -602,6 +606,158 @@ $on_game(Loaded) {
         lifetime.reset();
         return std::all_of(storage.begin() + sizeof(CCParticleSystemQuad), storage.end(),
             [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native shader construction and split tweens", [] {
+        alignas(GJShaderState) std::array<uint8_t, sizeof(GJShaderState) + 32> storage;
+        storage.fill(0xa5);
+        auto state = new (storage.data()) GJShaderState();
+        auto destroy = [](GJShaderState* value) { value->~GJShaderState(); };
+        std::unique_ptr<GJShaderState, decltype(destroy)> lifetime(state, destroy);
+        if (sizeof(GJShaderState) != 0x2d0 || offsetof(GJShaderState, m_splitActive) != 0x2c0 ||
+            !state->m_tweenActions.empty() || !state->m_tweenTimes.empty() ||
+            state->m_time != 0.0 || state->m_prevTime != -1.0 || state->m_startTime != 0.0 ||
+            state->m_textureScaleX != 1.f || state->m_textureScaleY != 1.f ||
+            state->m_cGSegmentHeight != 1.f || state->m_pixelateTargetX != 1.f ||
+            state->m_pixelateTargetY != 1.f || state->m_lensCircleSize != 1.f ||
+            state->m_motionBlurFollowEaseX != 1.f || state->m_motionBlurFollowEaseY != 1.f ||
+            state->m_invertColorR != 1.f || state->m_invertColorG != 1.f ||
+            state->m_invertColorB != 1.f || state->m_colorChangeCR != 1.f ||
+            state->m_colorChangeCG != 1.f || state->m_colorChangeCB != 1.f ||
+            state->m_splitActive || state->m_minBlendingLayer || state->m_usesShaders) return false;
+        state->updateTweenAction(3.25f, 45);
+        state->updateTweenAction(7.5f, 46);
+        if (state->m_splitTargetRows != 3.25 || state->m_splitTargetCols != 7.5 ||
+            state->m_splitActive || state->m_minBlendingLayer) return false;
+        state->m_time = 12.0;
+        state->tweenValue(0.f, 10.f, 1, 2.f, 0, 2.f);
+        if (state->m_tweenActions.size() != 1 || state->m_tweenTimes.at(1) != 12.0) return false;
+        state->updateTweenActions(1.f);
+        if (std::abs(state->m_chromaticTargetX - 5.f) > 0.001f) return false;
+        state->updateTweenActions(1.f);
+        if (!state->m_tweenActions.empty() || state->m_chromaticTargetX != 10.f) return false;
+        state->reset();
+        lifetime.reset();
+        return std::all_of(storage.begin() + sizeof(GJShaderState), storage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native custom enter effect registration", [] {
+        return withNativeEditor(true, [](LevelEditorLayer* editor) {
+            if (sizeof(EnterEffectInstance) != 0xe8 ||
+                offsetof(EnterEffectObject, m_enterChannel) != 0x800) return false;
+            auto first = EnterEffectObject::create("infoIcon_001.png");
+            auto second = EnterEffectObject::create("infoIcon_001.png");
+            if (!first || !second) return false;
+            auto& state = editor->m_gameState;
+            if (!state.m_enterEffectInstanceVectors.empty() || !state.m_exitEffectInstanceVectors.empty()) return false;
+            first->m_enterChannel = second->m_enterChannel = 3;
+            first->m_targetGroupID = 17;
+            first->m_centerGroupID = 29;
+            first->m_length = 150;
+            first->m_effectID = second->m_effectID = 41;
+            editor->addCustomEnterEffect(first, true);
+            auto& effects = state.m_enterEffectInstanceVectors.at(3);
+            if (effects.size() != 1 || effects.front().m_gameObject != first ||
+                effects.front().m_targetID != 17 || effects.front().m_centerID != 29 ||
+                effects.front().m_length != 150.f) return false;
+            first->m_length = 175;
+            editor->addCustomEnterEffect(first, true);
+            if (effects.size() != 1 || effects.front().m_length != 175.f) return false;
+            editor->addCustomEnterEffect(second, true);
+            if (effects.size() != 1 || effects.front().m_gameObject != second) return false;
+            editor->addCustomEnterEffect(first, false);
+            if (state.m_exitEffectInstanceVectors.at(3).size() != 1 ||
+                state.m_exitEffectInstanceVectors.at(3).front().m_gameObject != first) return false;
+            first->m_enterChannel = 101;
+            editor->addCustomEnterEffect(first, true);
+            return !state.m_enterEffectInstanceVectors.contains(101) && effects.size() == 1;
+        });
+    });
+
+    runBindingTest("Native custom enter effect removal", [] {
+        return withNativeEditor(true, [](LevelEditorLayer* editor) {
+            auto first = EnterEffectObject::create("infoIcon_001.png");
+            auto second = EnterEffectObject::create("infoIcon_001.png");
+            if (!first || !second) return false;
+            editor->stopCustomEnterEffect(first, true);
+            auto& state = editor->m_gameState;
+            if (state.m_enterChannelMap.size() < 101 || state.m_exitChannelMap.size() < 101) return false;
+            first->m_enterChannel = second->m_enterChannel = 4;
+            first->m_effectID = 41;
+            second->m_effectID = 42;
+            editor->addCustomEnterEffect(first, true);
+            editor->addCustomEnterEffect(second, true);
+            state.m_enterChannelMap[4] = -15;
+            editor->stopCustomEnterEffect(first, true);
+            auto& effects = state.m_enterEffectInstanceVectors.at(4);
+            if (effects.size() != 1 || effects.front().m_gameObject != second ||
+                state.m_enterChannelMap[4] != -15) return false;
+            editor->stopCustomEnterEffect(second, true);
+            if (!effects.empty() || state.m_enterChannelMap[4] != -2) return false;
+            editor->addCustomEnterEffect(first, false);
+            state.m_exitChannelMap[4] = -15;
+            first->m_effectID = 0;
+            editor->stopCustomEnterEffect(first, false);
+            if (state.m_exitEffectInstanceVectors.contains(4) || state.m_exitChannelMap[4] != -2) return false;
+            first->m_enterChannel = 0;
+            editor->addCustomEnterEffect(first, true);
+            first->m_enterChannel = -10;
+            state.m_enterChannelMap[0] = -15;
+            editor->stopCustomEnterEffect(first, true);
+            return !state.m_enterEffectInstanceVectors.contains(0) && state.m_enterChannelMap[0] == -2;
+        });
+    });
+
+    runBindingTest("Native extra game layer transforms", [] {
+        return withNativeEditor(true, [](LevelEditorLayer* editor) {
+            auto source = editor->m_objectLayer;
+            auto inside = editor->m_inShaderObjectLayer;
+            auto above = editor->m_aboveShaderObjectLayer;
+            if (!source || !inside || !above) return false;
+            source->setPosition({37.f, -53.f});
+            source->setScaleX(0.75f);
+            source->setScaleY(1.25f);
+            editor->updateExtraGameLayers();
+            for (auto target : {inside, above}) {
+                if (target->getPosition() != source->getPosition() ||
+                    target->getScaleX() != 0.75f || target->getScaleY() != 1.25f) return false;
+            }
+            return true;
+        });
+    });
+
+    runBindingTest("Native screen button positioning", [] {
+        auto config = std::make_unique<UIButtonConfig>();
+        config->reset();
+        auto node = GJUINode::create(*config);
+        if (!node || !typeinfo_cast<GJUINode*>(node) || !node->m_firstSprite || !node->m_secondSprite) return false;
+        node->m_firstSprite->setScale(0.75f);
+        node->m_radius = 18.f;
+        node->m_modeB = false;
+        node->updateButtonPositions();
+        float distance = node->m_firstSprite->getContentSize().width * 0.75f * 0.5f + 18.f;
+        if (node->m_firstSprite->getPosition() != CCPoint(-distance, 0.f) ||
+            node->m_secondSprite->getPosition() != CCPoint(distance, 0.f)) return false;
+        node->updateButtonScale(1.5f);
+        distance = node->m_firstSprite->getContentSize().width * 1.5f * 0.5f + 18.f;
+        if (node->m_firstSprite->getPositionX() != -distance ||
+            node->m_secondSprite->getPositionX() != distance) return false;
+        node->updateDragRadius(32.f);
+        distance += 14.f;
+        if (node->m_firstSprite->getPositionX() != -distance ||
+            node->m_secondSprite->getPositionX() != distance) return false;
+        auto secondPosition = node->m_secondSprite->getPosition();
+        node->m_modeB = true;
+        node->updateButtonPositions();
+        if (node->m_firstSprite->getPosition() != CCPoint(0.f, 0.f) ||
+            node->m_secondSprite->getPosition() != secondPosition) return false;
+        config->resetOneBtn();
+        auto single = GJUINode::create(*config);
+        if (!single || !single->m_firstSprite || single->m_secondSprite) return false;
+        auto position = single->m_firstSprite->getPosition();
+        single->updateButtonPositions();
+        return single->m_firstSprite->getPosition() == position;
     });
 
     runBindingTest("Native single button configuration reset", [] {

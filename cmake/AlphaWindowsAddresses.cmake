@@ -65,6 +65,28 @@ alpha_patch_address(GeometryDash GameManager
 alpha_patch_address(GeometryDash ItemInfoPopup
     "static ItemInfoPopup* create(int id, UnlockType type)" 0x3841e0)
 alpha_patch_address(GeometryDash UIButtonConfig "void resetOneBtn()" 0x275970)
+alpha_patch_address(GeometryDash GJUINode
+    "static GJUINode* create(UIButtonConfig& config)" 0x673b50 0x66d6e0)
+alpha_patch_address(GeometryDash GJUINode "void updateButtonPositions()" 0x674070)
+
+# Shader split targets are doubles: native tween actions 45/46 write 0x2b0
+# and 0x2b8. The flags follow at 0x2c0; construction reserves 0x2d0.
+alpha_patch_class(GeometryDash GJShaderState
+    "GJShaderState() = win 0x9999999" "GJShaderState() = win inline")
+alpha_patch_class(GeometryDash GJShaderState
+    "    float m_splitTargetRows;\n    float m_splitTargetCols;"
+    "    double m_splitTargetRows;\n    double m_splitTargetCols;")
+file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/GJShaderState.cpp" alpha_shader_constructor)
+file(APPEND "${alpha_bindings_output}/inline/GJShaderState.cpp" "\n${alpha_shader_constructor}")
+
+# EffectGameObject::triggerObject calls these with the complete game-layer
+# pointer. Their maps and channel vectors live in its GJGameState subobject.
+alpha_patch_address(GeometryDash GJBaseGameLayer
+    "void addCustomEnterEffect(EnterEffectObject* object, bool enter)" 0x314490)
+alpha_patch_address(GeometryDash GJBaseGameLayer
+    "void stopCustomEnterEffect(EnterEffectObject* object, bool enter)" 0x3147c0)
+alpha_patch_address(GeometryDash GJBaseGameLayer
+    "void updateExtraGameLayers()" 0x32b500)
 
 # AppDelegate's primary table is 0x719f88; its CCSceneDelegate subobject is
 # at 0xd8 with table 0x719f78. These callbacks remain native Windows APIs.
