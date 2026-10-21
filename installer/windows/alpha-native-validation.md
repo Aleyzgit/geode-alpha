@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `4457dd8` and the bindings revision is
 `9a9af08340e446a970d434502f84cc5de52251e5`. The generated Windows build has
-5,453 populated native wrappers, all pointing into executable sections of
+5,457 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The updated upstream declarations include the current gameplay-layer state
@@ -40,7 +40,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-101 checks cover native constructors, level/list cache fixtures, fresh/expired
+103 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -115,6 +115,18 @@ Custom SFX and table-cell callbacks use the current native order and bool/int
 return types. Runtime fixtures check derived editor dispatch and typed delegate
 callbacks. The audit excludes unmapped methods, overloads and classes without
 available native RTTI; it does not establish complete SDK compatibility.
+
+A broader structural audit checks 2,302 virtual entries across 467 classes,
+including unmapped methods. All have a matching native subobject offset and
+in-range slot; 2,120 also match their mapped native target. This found another
+base-offset error: Windows CCApplication owns an HMONITOR at 0xc8, before the
+settings at 0xd0..0xd6. Including it restores the native base size of 0xd8 and
+AppDelegate's CCSceneDelegate offset of 0xd8. The running-scene pointer is at
+0xe8, loading flag at 0xf0 and save time at 0xf8. Tests check the live delegate
+table and compare all seven settings with exported engine getters, restoring
+each temporary value immediately. Four native application/scene callbacks now
+have verified Windows bindings. Structural slot checks alone do not establish
+the signatures or behavior of unmapped methods.
 
 TabbedPopupLayer reserves 0x430 bytes, GameSettingsLayer 0x4a8,
 LevelBrowserLayer 0x348 and LevelListLayer 0x408. Their inherited delegate

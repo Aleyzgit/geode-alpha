@@ -40,6 +40,23 @@ function(alpha_patch_address file class signature address)
         "${signature} = win ${expected}" "${signature} = win ${address}")
 endfunction()
 
+# AppDelegate's primary table is 0x719f88; its CCSceneDelegate subobject is
+# at 0xd8 with table 0x719f78. These callbacks remain native Windows APIs.
+if (WIN32)
+    alpha_patch_class(GeometryDash AppDelegate
+        "virtual void applicationDidEnterBackground();"
+        "virtual void applicationDidEnterBackground() = win 0x98630;")
+    alpha_patch_class(GeometryDash AppDelegate
+        "virtual void applicationWillResignActive() = imac"
+        "virtual void applicationWillResignActive() = win 0x985b0, imac")
+    alpha_patch_class(GeometryDash AppDelegate
+        "virtual void applicationWillTerminate();"
+        "virtual void applicationWillTerminate() = win 0x985c0;")
+    alpha_patch_class(GeometryDash AppDelegate
+        "virtual void willSwitchToScene(cocos2d::CCScene* scene);"
+        "virtual void willSwitchToScene(cocos2d::CCScene* scene) = win 0x98cc0;")
+endif()
+
 # CCRGBAProtocol vtable at RVA 0x709498; all fourteen implementations have
 # identical instructions and field offsets to the 2.2081 implementations.
 alpha_patch_address(Cocos2d cocos2d::CCLightning

@@ -1,4 +1,5 @@
 #include <Geode/binding/AchievementManager.hpp>
+#include <Geode/binding/AppDelegate.hpp>
 #include <Geode/binding/BoomScrollLayer.hpp>
 #include <Geode/binding/ButtonSprite.hpp>
 #include <Geode/binding/BrowseSmartTemplateLayer.hpp>
@@ -347,6 +348,51 @@ namespace {
 
 $on_game(Loaded) {
     if (!Loader::get()->getLaunchFlag("alpha-self-test")) return;
+
+    runBindingTest("Native application scene delegate layout", [] {
+        auto app = AppDelegate::get();
+        if (!app || sizeof(CCApplication) != 0xd8 || sizeof(AppDelegate) != 0x100) return false;
+        auto bytes = reinterpret_cast<uint8_t const*>(app);
+        auto delegate = static_cast<CCSceneDelegate*>(app);
+        auto table = *reinterpret_cast<uintptr_t const* const*>(delegate);
+        return reinterpret_cast<uint8_t const*>(delegate) - bytes == 0xd8 &&
+            table[0] == geode::base::get() + 0x98cc0 &&
+            offsetof(AppDelegate, m_glViewSetup) == 0xe0 &&
+            offsetof(AppDelegate, m_gamePaused) == 0xe1 &&
+            offsetof(AppDelegate, m_runningScene) == 0xe8 &&
+            offsetof(AppDelegate, m_loadingFinished) == 0xf0 &&
+            offsetof(AppDelegate, m_saveTime) == 0xf8 && app->m_loadingFinished;
+    });
+
+    runBindingTest("Native application setting accessors", [] {
+        if (sizeof(CCApplication) != 0xd8 ||
+            offsetof(CCApplication, m_bVerticalSyncEnabled) != 0xd0) return false;
+        auto app = CCApplication::sharedApplication();
+        auto module = GetModuleHandleW(L"libcocos2d.dll");
+        if (!app || !module) return false;
+        struct Setting {
+            bool CCApplication::* field;
+            char const* getter;
+        };
+        Setting settings[] = {
+            {&CCApplication::m_bVerticalSyncEnabled, "?getVerticalSyncEnabled@CCApplication@cocos2d@@QEBA_NXZ"},
+            {&CCApplication::m_bControllerConnected, "?getControllerConnected@CCApplication@cocos2d@@QEBA_NXZ"},
+            {&CCApplication::m_bSleepMode, "?getSleepMode@CCApplication@cocos2d@@QEBA_NXZ"},
+            {&CCApplication::m_bForceTimer, "?getForceTimer@CCApplication@cocos2d@@QEBA_NXZ"},
+            {&CCApplication::m_bSmoothFix, "?getSmoothFix@CCApplication@cocos2d@@QEBA_NXZ"},
+            {&CCApplication::m_bFullscreen, "?getFullscreen@CCApplication@cocos2d@@QEBA_NXZ"},
+            {&CCApplication::m_bBorderless, "?getBorderless@CCApplication@cocos2d@@QEBA_NXZ"},
+        };
+        for (auto const& setting : settings) {
+            auto getter = reinterpret_cast<bool (*)(CCApplication const*)>(GetProcAddress(module, setting.getter));
+            if (!getter) return false;
+            AlphaTestField restore(app->*setting.field, false);
+            if (getter(app)) return false;
+            app->*setting.field = true;
+            if (!getter(app)) return false;
+        }
+        return true;
+    });
 
     runBindingTest("Native achievement lookup", [] {
         auto manager = AchievementManager::sharedState();

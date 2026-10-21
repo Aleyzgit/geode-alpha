@@ -8,6 +8,8 @@ if (Get-Process -Name $name -ErrorAction SilentlyContinue) {
     throw 'Close this test game before running native validation.'
 }
 $expected = @(
+    'Native application scene delegate layout',
+    'Native application setting accessors',
     'Native PVR loader rejects invalid headers',
     'Native level-manager constructor',
     'Native level-manager caches',
