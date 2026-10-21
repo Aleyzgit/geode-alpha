@@ -49,6 +49,8 @@ $expected = @(
     'Native custom enter effect registration',
     'Native custom enter effect removal',
     'Native extra game layer transforms',
+    'Native editor grid shader parenting',
+    'Native editor zoom anchors and SDK controls',
     'Native screen button positioning',
     'Native achievement unlock application',
     'Native item information factories',

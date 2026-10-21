@@ -53,6 +53,11 @@ alpha_patch_address(GeometryDash GameObject
     "bool shouldBlendColor(GJSpriteColor* color, bool mainColor)" 0x28de70)
 alpha_patch_address(GeometryDash EditorUI
     "bool canSelectObject(GameObject* object)" 0x1c8500)
+alpha_patch_address(GeometryDash EditorUI "void updateZoom(float zoom)" 0x1b4c00)
+alpha_patch_class(GeometryDash EditorUI
+    "    TodoReturn updateZoom(float, cocos2d::CCPoint);"
+    "    void updateZoom(float zoom, cocos2d::CCPoint anchor) = win 0x1b4c70;")
+alpha_patch_address(GeometryDash LevelEditorLayer "void updateGridLayerParent()" 0x3ef7a0)
 
 # Native alert callbacks use this level deletion routine. Local editor levels
 # are removed from their own array; downloaded levels retain earned progress.

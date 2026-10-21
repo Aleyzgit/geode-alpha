@@ -1143,6 +1143,73 @@ $on_game(Loaded) {
         });
     });
 
+    runBindingTest("Native editor grid shader parenting", [] {
+        return withNativeEditor(true, [](LevelEditorLayer* editor) {
+            auto grid = editor->m_drawGridLayer;
+            auto shader = std::make_unique<ShaderLayer>();
+            AlphaTestField shaderState(editor->m_shaderLayer, static_cast<ShaderLayer*>(nullptr));
+            if (!grid || !editor->m_objectLayer || !editor->m_aboveShaderObjectLayer ||
+                offsetof(ShaderLayer, m_state) + offsetof(GJShaderState, m_usesShaders) != 0x466) return false;
+            grid->setZOrder(717);
+            grid->setPosition({23.f, -17.f});
+            editor->updateGridLayerParent();
+            if (grid->getParent() != editor->m_objectLayer) return false;
+            auto references = grid->retainCount();
+            editor->m_shaderLayer = shader.get();
+            for (bool active : {true, true, false, false, true}) {
+                shader->m_state.m_usesShaders = active;
+                editor->updateGridLayerParent();
+                auto expected = active ? editor->m_aboveShaderObjectLayer : editor->m_objectLayer;
+                if (grid->getParent() != expected || grid->retainCount() != references ||
+                    grid->getZOrder() != 717 || grid->getPosition() != CCPoint{23.f, -17.f}) return false;
+            }
+            editor->m_shaderLayer = nullptr;
+            editor->updateGridLayerParent();
+            return grid->getParent() == editor->m_objectLayer && grid->retainCount() == references;
+        });
+    });
+
+    runBindingTest("Native editor zoom anchors and SDK controls", [] {
+        return withNativeEditor(false, [](LevelEditorLayer* editor) {
+            auto parent = CCLayer::create();
+            if (editor->getParent()) return false;
+            parent->addChild(editor);
+            auto detach = [](LevelEditorLayer* value) { value->removeFromParentAndCleanup(false); };
+            std::unique_ptr<LevelEditorLayer, decltype(detach)> attachment(editor, detach);
+            AlphaTestField variables(GameManager::get()->m_valueKeeper, CCDictionary::create());
+            GameManager::get()->setGameVariable("0195", true);
+            auto ui = editor->m_editorUI;
+            auto layer = editor->m_objectLayer;
+            layer->setPosition({-1000.f, -1000.f});
+            layer->setScale(1.f);
+            auto center = CCDirector::sharedDirector()->getWinSize() * .5f;
+            auto local = layer->convertToNodeSpace(center);
+            ui->updateZoom(2.f);
+            auto anchored = layer->convertToWorldSpace(local);
+            if (layer->getScale() != 2.f || std::abs(anchored.x - center.width) > .001f ||
+                std::abs(anchored.y - center.height) > .001f) return false;
+            CCPoint anchor{137.f, 91.f};
+            local = layer->convertToNodeSpace(anchor);
+            ui->updateZoom(3.f, anchor);
+            anchored = layer->convertToWorldSpace(local);
+            if (layer->getScale() != 3.f || std::abs(anchored.x - anchor.x) > .001f ||
+                std::abs(anchored.y - anchor.y) > .001f) return false;
+            parent->setScale(.75f);
+            ui->updateZoom(1.f);
+            if (parent->getScale() != .75f || layer->getScale() != 1.f) return false;
+            ui->zoomGameLayer(true);
+            if (std::abs(layer->getScale() - 1.1f) > .00001f) return false;
+            ui->zoomGameLayer(false);
+            if (std::abs(layer->getScale() - 1.f) > .00001f) return false;
+            layer->setScale(4.f);
+            ui->zoomGameLayer(true);
+            if (layer->getScale() != 4.f) return false;
+            layer->setScale(.1f);
+            ui->zoomGameLayer(false);
+            return layer->getScale() == .1f && parent->getScale() == .75f;
+        });
+    });
+
     runBindingTest("Native extra game layer transforms", [] {
         return withNativeEditor(true, [](LevelEditorLayer* editor) {
             auto source = editor->m_objectLayer;

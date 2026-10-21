@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 18 Windows address placeholders are in
+respective modules. The remaining 16 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,491 populated native wrappers, all pointing into executable sections of
+5,494 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -137,6 +137,14 @@ A fresh editor with two real speed portals supplies a separate native-call
 oracle at several times. The fixture verifies that the portals affect travel,
 using their native sorted leading edges rather than sprite-center positions.
 Temporary timewarp and direction globals are restored after the comparison.
+EditorUI::updateZoom uses 0x1b4c00 for centered zoom, also called by the native
+mouse-wheel handler, and 0x1b4c70 for an explicit point. The latter's return
+type is void. A fresh editor fixture verifies both fixed world-space anchors,
+restoration of the editor parent's scale, SDK zoom-button behavior and its
+0.1/4.0 limits. LevelEditorLayer::updateGridLayerParent at 0x3ef7a0 moves the
+grid between object and above-shader layers according to m_state.m_usesShaders
+at shader offset 0x466. Its fixture checks shader absence, repeated transitions,
+stable reference counts and preservation of position and Z order.
 LevelTools::getLevelList returns the 43 IDs embedded in the native
 GameManager::recountUserStats routine. Windows inlines the set construction,
 so the SDK provides an owning unordered_set instead of exposing an interior
@@ -165,7 +173,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-150 checks cover native constructors, level/list cache fixtures, fresh/expired
+152 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
