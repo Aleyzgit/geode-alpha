@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 50 Windows address placeholders are in
+respective modules. The remaining 47 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `4457dd8` and the bindings revision is
 `9a9af08340e446a970d434502f84cc5de52251e5`. The generated Windows build has
-5,457 populated native wrappers, all pointing into executable sections of
+5,460 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The updated upstream declarations include the current gameplay-layer state
@@ -40,7 +40,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-103 checks cover native constructors, level/list cache fixtures, fresh/expired
+108 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -192,14 +192,30 @@ options. The old m_minCount field is absent from the Windows SDK.
 Native close (0x47f2d0), clear-all (0x47eef0), search clear (0x47efa0) and
 match toggle (0x47ee60) are exposed. Fixtures create a real popup and option
 row, toggle selection through the native row, clear selections, clear search,
-exercise filtering and initialize an SDK-constructed popup. Match toggle is
-only checked with no search-result model; its populated-model behavior remains
-outside these fixtures. Guarded SDK construction/destruction covers both
+exercise filtering and initialize an SDK-constructed popup. A populated SDK
+search model verifies real Match: All/Any button clicks, labels, placement,
+sort-preserving virtual refresh and repeated control creation. The refresh is
+overridden locally so that this fixture does not request a music library.
+Guarded SDK construction/destruction covers both
 objects and an OptionsCell containing a real native label. OptionsScrollLayer
 and OptionsCell use their native deleting destructors with explicit flags zero
 and the SDK destruction-lock protocol, preserving existing inline helpers.
 All four such native destructor-helper addresses also pass the executable
 section audit, separately from the generated-wrapper count.
+
+MusicSearchResult exposes the native All/Any flag at 0x8e and view-filter mode
+at 0x94 without changing its 0xb0 allocation. applyTagFilters (0x497d00),
+applyArtistFilters (0x4981c0) and updateFutureCount (0x498460) replace the
+unresolved tag entry and incomplete SDK filtering/counting bodies. Tag filters
+support intersection and union; artist filters include primary and additional
+artists. Tests cover unchanged input with no selections, empty input, both
+tag modes, artist matching and future counts including additional artists.
+The single-ID manager helpers are inlined in the current native functions;
+equivalent SDK implementations retain the old API's fresh arrays, order,
+duplicates and null handling. They are not presented as separate native
+addresses. The missing addTagMatchToggle helper reconstructs the control
+inlined by MusicBrowser::onTags using the same button style and coordinates.
+These changes remove three Windows address placeholders.
 
 GJLevelList::reorderLevel uses 0x272d00, also called by native list-row actions;
 tests cover moves in both directions, clamped positions, absent IDs, one-item

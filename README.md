@@ -64,7 +64,7 @@ The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
 The GJGameLevel layout and editor build statistics now use the newer upstream
 bindings, including corrected level-browser, slider and secret-level methods.
-**50 Windows native-address placeholders remain**
+**47 Windows native-address placeholders remain**
 in the pinned game declarations. The engine declarations have no remaining
 Windows placeholders. Additional unsafe or incorrect entries have been corrected,
 including PVR functions that previously pointed outside executable memory.
@@ -98,7 +98,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. The 101 native checks passed in both
+Windows validation used Clang 21.1.8. The 108 native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -142,6 +142,12 @@ level browsers reserve their full native
 allocations; fixtures cover construction/destruction boundaries and actual
 game-settings tab dispatch. This audit covers known mapped virtual methods,
 not every SDK interface or mod.
+An expanded structural audit covers 2,302 virtual entries across 467 classes,
+including 2,120 mapped native targets, with no remaining disagreements in that
+sample. It found a missing Windows monitor handle in CCApplication; restoring
+the field fixes application setting offsets and AppDelegate's scene-delegate
+base. Live tests compare the settings with exported engine getters. Four native
+application/scene callbacks are also available for Windows hooks again.
 Native list parsing and reordering handle replacement, position bounds and
 empty lists. Paged reloads dispatch through their native request/clear callbacks.
 Picker interfaces now require typed recipient-array/count and ID-name receivers.
@@ -160,7 +166,11 @@ Options objects and their search popup use their native 0x78/0x300 layouts.
 The incomplete popup initializer and minimum-count filter are replaced with
 the native initialization and search functions. Fixtures exercise real option
 rows, clearing selections/search, case-insensitive filtering and SDK lifetimes.
-All 5,453 populated generated wrappers point into executable
+Music search uses native tag/artist filtering and future counts, including
+All/Any tags and additional artists. The SDK also supplies the single-ID filter
+helpers and missing Match: All/Any control. Fixtures verify local filtering,
+counts and real button clicks through an isolated search model.
+All 5,460 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its

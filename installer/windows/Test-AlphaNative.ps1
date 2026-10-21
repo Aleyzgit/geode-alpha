@@ -10,6 +10,11 @@ if (Get-Process -Name $name -ErrorAction SilentlyContinue) {
 $expected = @(
     'Native application scene delegate layout',
     'Native application setting accessors',
+    'Native music search state layout',
+    'Native music tag and artist filters',
+    'Native music future filter counts',
+    'SDK single music filter helpers',
+    'Native music match control',
     'Native PVR loader rejects invalid headers',
     'Native level-manager constructor',
     'Native level-manager caches',

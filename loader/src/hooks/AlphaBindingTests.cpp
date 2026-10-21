@@ -43,6 +43,7 @@
 #include <Geode/binding/LevelSearchLayer.hpp>
 #include <Geode/binding/MusicDownloadManager.hpp>
 #include <Geode/binding/MusicBrowser.hpp>
+#include <Geode/binding/MusicSearchResult.hpp>
 #include <Geode/binding/NewgroundsInfoLayer.hpp>
 #include <Geode/binding/NumberInputLayer.hpp>
 #include <Geode/binding/NumberInputDelegate.hpp>
@@ -57,6 +58,7 @@
 #include <Geode/binding/PlayLayer.hpp>
 #include <Geode/binding/ReportQueuePopup.hpp>
 #include <Geode/binding/SFXBrowser.hpp>
+#include <Geode/binding/SongInfoObject.hpp>
 #include <Geode/binding/SpriteAnimationManager.hpp>
 #include <Geode/binding/ScrollViewPopup.hpp>
 #include <Geode/binding/SetTextPopup.hpp>
@@ -166,6 +168,15 @@ namespace {
     class AlphaTabbedFixture final : public TabbedPopupLayer {};
     class AlphaBrowserFixture final : public LevelBrowserLayer {};
     class AlphaListFixture final : public LevelListLayer {};
+    class AlphaMusicSearchFixture final : public MusicSearchResult {
+    public:
+        int updates = 0;
+        AudioSortType lastSort = AudioSortType::NameAscending;
+        void updateObjects(AudioSortType sort) override {
+            ++updates;
+            lastSort = sort;
+        }
+    };
 
     template <class T>
     bool checkConstructionBoundary() {
@@ -344,6 +355,38 @@ namespace {
         }
         return valid && !manager->m_levelEditorLayer;
     }
+
+    template <class F>
+    bool withMusicFilters(F test) {
+        auto pool = CCPoolManager::sharedPoolManager();
+        pool->push();
+        auto pop = [](CCPoolManager* value) { value->pop(); };
+        std::unique_ptr<CCPoolManager, decltype(pop)> scope(pool, pop);
+        auto search = MusicSearchResult::create(GJSongType::Music);
+        auto songs = CCArray::create();
+        for (int i = 0; i < 3; ++i) {
+            auto song = SongInfoObject::create(717171 + i);
+            if (!song) return false;
+            song->m_artistID = 10 + i;
+            song->m_artistIDs.clear();
+            song->m_tags = i == 0 ? std::set<int>{1, 2} : std::set<int>{i};
+            songs->addObject(song);
+        }
+        static_cast<SongInfoObject*>(songs->objectAtIndex(0))->m_artistIDs.insert(11);
+        if (!search) return false;
+        auto tags = CCArray::create();
+        auto artists = CCArray::create();
+        for (int i = 0; i < 3; ++i) {
+            auto tag = OptionsObject::create(i + 1, false, "Alpha tag", nullptr);
+            auto artist = OptionsObject::create(i + 10, false, "Alpha artist", nullptr);
+            if (!tag || !artist) return false;
+            tags->addObject(tag);
+            artists->addObject(artist);
+        }
+        AlphaTestField tagState(search->m_tagFilterObjects, tags);
+        AlphaTestField artistState(search->m_artistFilterObjects, artists);
+        return test(search, songs, tags, artists);
+    }
 }
 
 $on_game(Loaded) {
@@ -392,6 +435,126 @@ $on_game(Loaded) {
             if (!getter(app)) return false;
         }
         return true;
+    });
+
+    runBindingTest("Native music search state layout", [] {
+        auto search = MusicSearchResult::create(GJSongType::Music);
+        return search && sizeof(MusicSearchResult) == 0xb0 &&
+            offsetof(MusicSearchResult, m_tagFilterObjects) == 0x48 &&
+            offsetof(MusicSearchResult, m_artistFilterObjects) == 0x50 &&
+            offsetof(MusicSearchResult, m_matchAnyTags) == 0x8e &&
+            offsetof(MusicSearchResult, m_viewFilterMode) == 0x94 &&
+            offsetof(SongInfoObject, m_artistID) == 0x1a8 &&
+            offsetof(SongInfoObject, m_artistIDs) == 0x218 &&
+            offsetof(SongInfoObject, m_tags) == 0x2c8 &&
+            !search->m_matchAnyTags && search->m_viewFilterMode == 0;
+    });
+
+    runBindingTest("Native music tag and artist filters", [] {
+        return withMusicFilters([](MusicSearchResult* search, CCArray* songs, CCArray* tags, CCArray* artists) {
+            if (search->applyTagFilters(songs) != songs || search->m_tagFilter ||
+                search->applyArtistFilters(songs) != songs || search->m_artistFilter) return false;
+            auto firstTag = static_cast<OptionsObject*>(tags->objectAtIndex(0));
+            auto secondTag = static_cast<OptionsObject*>(tags->objectAtIndex(1));
+            firstTag->m_enabled = secondTag->m_enabled = true;
+            auto all = search->applyTagFilters(songs);
+            if (all->count() != 1 || all->objectAtIndex(0) != songs->objectAtIndex(0) ||
+                !search->m_tagFilter) return false;
+            search->m_matchAnyTags = true;
+            auto any = search->applyTagFilters(songs);
+            if (any->count() != 3) return false;
+            for (unsigned int i = 0; i < songs->count(); ++i) {
+                if (any->objectAtIndex(i) != songs->objectAtIndex(i)) return false;
+            }
+            auto artist = static_cast<OptionsObject*>(artists->objectAtIndex(1));
+            artist->m_enabled = true;
+            auto selected = search->applyArtistFilters(songs);
+            if (selected->count() != 2 || selected->objectAtIndex(0) != songs->objectAtIndex(0) ||
+                selected->objectAtIndex(1) != songs->objectAtIndex(1) || !search->m_artistFilter) return false;
+            search->m_matchAnyTags = false;
+            auto empty = CCArray::create();
+            return search->applyTagFilters(empty) == empty && search->m_tagFilter &&
+                search->applyArtistFilters(empty) == empty && !search->m_artistFilter && songs->count() == 3;
+        });
+    });
+
+    runBindingTest("Native music future filter counts", [] {
+        return withMusicFilters([](MusicSearchResult* search, CCArray* songs, CCArray* tags, CCArray* artists) {
+            auto first = static_cast<OptionsObject*>(tags->objectAtIndex(0));
+            auto second = static_cast<OptionsObject*>(tags->objectAtIndex(1));
+            auto absent = static_cast<OptionsObject*>(tags->objectAtIndex(2));
+            first->m_enabled = second->m_enabled = true;
+            auto all = search->applyTagFilters(songs);
+            search->updateFutureCount(all, songs, songs);
+            if (first->m_count != 1 || second->m_count != 1 || absent->m_count != 0 ||
+                static_cast<OptionsObject*>(artists->objectAtIndex(0))->m_count != 1 ||
+                static_cast<OptionsObject*>(artists->objectAtIndex(1))->m_count != 1 ||
+                static_cast<OptionsObject*>(artists->objectAtIndex(2))->m_count != 0) return false;
+            search->m_matchAnyTags = true;
+            auto any = search->applyTagFilters(songs);
+            search->updateFutureCount(any, songs, songs);
+            return first->m_count == 2 && second->m_count == 2 && absent->m_count == 0 &&
+                static_cast<OptionsObject*>(artists->objectAtIndex(0))->m_count == 1 &&
+                static_cast<OptionsObject*>(artists->objectAtIndex(1))->m_count == 2 &&
+                static_cast<OptionsObject*>(artists->objectAtIndex(2))->m_count == 1;
+        });
+    });
+
+    runBindingTest("SDK single music filter helpers", [] {
+        return withMusicFilters([](MusicSearchResult*, CCArray* songs, CCArray*, CCArray*) {
+            auto manager = MusicDownloadManager::sharedState();
+            auto duplicate = CCArray::create();
+            duplicate->addObjectsFromArray(songs);
+            duplicate->addObject(songs->objectAtIndex(0));
+            auto artists = manager->filterMusicByArtistID(11, duplicate);
+            auto tags = manager->filterMusicByTag(1, duplicate);
+            if (artists->count() != 3 || tags->count() != 3) return false;
+            for (unsigned int i = 0; i < 3; ++i) {
+                auto expected = songs->objectAtIndex(i == 1 ? 1 : 0);
+                if (artists->objectAtIndex(i) != expected || tags->objectAtIndex(i) != expected) return false;
+            }
+            return manager->filterMusicByArtistID(99, songs)->count() == 0 &&
+                manager->filterMusicByTag(99, songs)->count() == 0 &&
+                manager->filterMusicByArtistID(11, nullptr)->count() == 0 &&
+                manager->filterMusicByTag(1, nullptr)->count() == 0 && duplicate->count() == 4;
+        });
+    });
+
+    runBindingTest("Native music match control", [] {
+        auto pool = CCPoolManager::sharedPoolManager();
+        pool->push();
+        auto pop = [](CCPoolManager* value) { value->pop(); };
+        std::unique_ptr<CCPoolManager, decltype(pop)> scope(pool, pop);
+        auto search = new AlphaMusicSearchFixture();
+        search->autorelease();
+        search->init(GJSongType::Music);
+        auto option = OptionsObject::create(1, false, "Alpha match fixture", nullptr);
+        if (!option) return false;
+        option->m_count = 1;
+        auto options = CCArray::create();
+        options->addObject(option);
+        auto popup = OptionsScrollLayer::create(options, true, "Alpha match fixture", search);
+        if (!popup || popup->m_searchResult != search) return false;
+        popup->addTagMatchToggle();
+        auto button = popup->m_matchButton;
+        if (!button || button->getParent() != popup->m_buttonMenu) return false;
+        auto sprite = static_cast<ButtonSprite*>(button->getNormalImage());
+        if (!sprite || std::string(sprite->m_label->getString()) != "Match: All") return false;
+        auto size = CCDirector::sharedDirector()->getWinSize();
+        auto position = popup->m_buttonMenu->convertToWorldSpace(button->getPosition());
+        if (std::abs(position.x - size.width / 2 - 131.f) > 0.01f ||
+            std::abs(position.y - size.height / 2 - 121.f) > 0.01f) return false;
+        auto children = popup->m_buttonMenu->getChildrenCount();
+        popup->addTagMatchToggle();
+        if (popup->m_matchButton != button || popup->m_buttonMenu->getChildrenCount() != children) return false;
+        button->activate();
+        if (!search->m_matchAnyTags || search->updates != 1 || search->lastSort != search->m_sortType ||
+            std::string(sprite->m_label->getString()) != "Match: Any") return false;
+        button->activate();
+        bool restored = !search->m_matchAnyTags && search->updates == 2 &&
+            std::string(sprite->m_label->getString()) == "Match: All";
+        popup->onClose(nullptr);
+        return restored;
     });
 
     runBindingTest("Native achievement lookup", [] {

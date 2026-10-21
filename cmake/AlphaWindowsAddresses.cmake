@@ -928,6 +928,118 @@ bool OptionsScrollLayer::init(cocos2d::CCArray* objects, bool recreate, std::str
     alpha_patch_deleting_destructor(OptionsCell 0x151070)
 endif()
 
+# MusicSearchResult::updateObjects calls artist filtering at 0x4981c0, tag
+# filtering at 0x497d00 and future counts at 0x498460. The native constructor
+# initializes the All/Any flag at 0x8e and view-filter mode at 0x94.
+if (WIN32)
+    alpha_patch_class(GeometryDash MusicSearchResult
+        "    bool m_artistFilter;"
+        "    bool m_artistFilter;\n    bool m_matchAnyTags;")
+    alpha_patch_class(GeometryDash MusicSearchResult
+        "    GJSongType m_songType;"
+        "    GJSongType m_songType;\n    int m_viewFilterMode;")
+    alpha_patch_class(GeometryDash MusicSearchResult
+        "applyArtistFilters(cocos2d::CCArray* objects) = win inline"
+        "applyArtistFilters(cocos2d::CCArray* objects) = win 0x4981c0")
+    alpha_patch_class(GeometryDash MusicSearchResult
+        "updateFutureCount(cocos2d::CCArray*, cocos2d::CCArray*, cocos2d::CCArray*) = win inline"
+        "updateFutureCount(cocos2d::CCArray*, cocos2d::CCArray*, cocos2d::CCArray*) = win 0x498460")
+    alpha_patch_class(GeometryDash OptionsScrollLayer
+        "    TodoReturn addTagMatchToggle();"
+        "    void addTagMatchToggle() = win inline;")
+    # MusicBrowser::onTags inlines this control with the standard button theme.
+    file(APPEND "${alpha_bindings_output}/inline/OptionsScrollLayer.cpp" [=[
+#include <Geode/binding/ButtonSprite.hpp>
+#include <Geode/binding/MusicSearchResult.hpp>
+#ifdef GEODE_IS_WINDOWS
+void OptionsScrollLayer::addTagMatchToggle() {
+    if (!m_searchResult || m_matchButton) return;
+    auto sprite = ButtonSprite::create(m_searchResult->m_matchAnyTags ? "Match: Any" : "Match: All",
+        78, 0, 0.4f, true, "bigFont.fnt", "GJ_button_04.png", 22.f);
+    if (!sprite) return;
+    m_matchButton = CCMenuItemSpriteExtra::create(sprite, this, menu_selector(OptionsScrollLayer::onMatchToggle));
+    m_buttonMenu->addChild(m_matchButton);
+    auto size = cocos2d::CCDirector::sharedDirector()->getWinSize();
+    m_matchButton->setPosition(m_buttonMenu->convertToNodeSpace({size.width / 2 + 131.f, size.height / 2 + 121.f}));
+}
+#endif
+]=])
+    set(alpha_search_inline "${alpha_bindings_output}/inline/MusicSearchResult.cpp")
+    file(READ "${alpha_search_inline}" alpha_search_content)
+    set(alpha_search_artist [=[cocos2d::CCArray* MusicSearchResult::applyArtistFilters(cocos2d::CCArray* objects) {
+    if (objects->count() == 0) return objects;
+    auto filterObjects = cocos2d::CCArray::create();
+    m_artistFilter = false;
+    for (auto object : geode::cocos::CCArrayExt<OptionsObject, false>(m_artistFilterObjects)) {
+        if (object->m_enabled) {
+            m_artistFilter = true;
+            auto filtered = MusicDownloadManager::sharedState()->filterMusicByArtistID(object->m_optionID, objects);
+            for (auto fobj : geode::cocos::CCArrayExt<OptionsObject, false>(filtered)) {
+                filterObjects->addObject(fobj);
+            }
+        }
+    }
+    return m_artistFilter ? filterObjects : objects;
+}
+]=])
+    set(alpha_search_counts [=[// TODO: 2.209
+void MusicSearchResult::updateFutureCount(cocos2d::CCArray* objects, cocos2d::CCArray* allObjects, cocos2d::CCArray* p0) {
+    auto count = objects->count();
+    for (auto object : geode::cocos::CCArrayExt<OptionsObject, false>(m_tagFilterObjects)) {
+        object->m_count = object->m_enabled ? MusicDownloadManager::sharedState()->filterMusicByTag(object->m_optionID, objects)->count() : count;
+    }
+    auto filtered = this->applyTagFilters(allObjects);
+    for (auto object : geode::cocos::CCArrayExt<OptionsObject, false>(m_artistFilterObjects)) {
+        object->m_count = MusicDownloadManager::sharedState()->filterMusicByArtistID(object->m_optionID, filtered)->count();
+    }
+}
+]=])
+    foreach(body IN ITEMS "${alpha_search_artist}" "${alpha_search_counts}")
+        string(FIND "${alpha_search_content}" "${body}" alpha_search_match)
+        if (alpha_search_match LESS 0)
+            message(FATAL_ERROR "Unexpected MusicSearchResult inline implementation")
+        endif()
+        string(REPLACE "${body}" "" alpha_search_content "${alpha_search_content}")
+    endforeach()
+    file(CONFIGURE OUTPUT "${alpha_search_inline}" CONTENT "${alpha_search_content}" @ONLY)
+    foreach(method IN ITEMS "filterMusicByArtistID" "filterMusicByTag")
+        alpha_patch_class(GeometryDash MusicDownloadManager
+            "${method}(int id, cocos2d::CCArray* songs) = win 0x9999999"
+            "${method}(int id, cocos2d::CCArray* songs) = win inline")
+    endforeach()
+    # These single-ID helpers are inlined in the current native filters.
+    # Preserve the old API's fresh array, order, duplicates and null handling.
+    file(APPEND "${alpha_bindings_output}/inline/MusicDownloadManager.cpp" [=[
+#ifdef GEODE_IS_WINDOWS
+cocos2d::CCArray* MusicDownloadManager::filterMusicByArtistID(int id, cocos2d::CCArray* songs) {
+    auto result = cocos2d::CCArray::create();
+    if (songs) {
+        for (unsigned int i = 0; i < songs->count(); ++i) {
+            auto song = static_cast<SongInfoObject*>(songs->objectAtIndex(i));
+            if (song->m_artistID == id || song->m_artistIDs.find(id) != song->m_artistIDs.end()) {
+                result->addObject(song);
+            }
+        }
+    }
+    return result;
+}
+
+cocos2d::CCArray* MusicDownloadManager::filterMusicByTag(int id, cocos2d::CCArray* songs) {
+    auto result = cocos2d::CCArray::create();
+    if (songs) {
+        for (unsigned int i = 0; i < songs->count(); ++i) {
+            auto song = static_cast<SongInfoObject*>(songs->objectAtIndex(i));
+            if (song->m_tags.find(id) != song->m_tags.end()) result->addObject(song);
+        }
+    }
+    return result;
+}
+#endif
+]=])
+endif()
+alpha_patch_address(GeometryDash MusicSearchResult
+    "cocos2d::CCArray* applyTagFilters(cocos2d::CCArray* objects)" 0x497d00)
+
 # Native list-row actions call the reorder function directly; coder loading
 # calls the parser at 0x2728a0, not the unrelated old shader address.
 alpha_patch_address(GeometryDash GJLevelList
