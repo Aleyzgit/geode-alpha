@@ -95,7 +95,9 @@
 #include <Geode/binding/ScrollViewPopup.hpp>
 #include <Geode/binding/SetTextPopup.hpp>
 #include <Geode/binding/SetTextPopupDelegate.hpp>
+#include <Geode/binding/SearchSFXPopup.hpp>
 #include <Geode/binding/TimeSpeedControl.hpp>
+#include <Geode/utils/file.hpp>
 #include <Geode/binding/CCTextInputNode.hpp>
 #include <Geode/binding/VirtualRowSource.hpp>
 #include <Geode/binding/UserInfoDelegate.hpp>
@@ -619,6 +621,14 @@ namespace {
 
 $on_game(Loaded) {
     if (!Loader::get()->getLaunchFlag("alpha-self-test")) return;
+
+    runBindingTest("Buffered logger preserves complete messages", [] {
+        auto marker = "alpha-buffer-boundary:" + std::string(65536, 'x') + ":end";
+        log::info("{}", marker);
+        log::flush();
+        auto contents = utils::file::readString(log::getCurrentLogPath());
+        return contents && contents.unwrap().find(marker) != std::string::npos;
+    });
 
     runBindingTest("Native application scene delegate layout", [] {
         auto app = AppDelegate::get();
@@ -2000,6 +2010,44 @@ $on_game(Loaded) {
         popup->m_delegate = &receiver;
         popup->onClose(nullptr);
         return receiver.popup == popup && receiver.text == "fixture";
+    });
+
+    runBindingTest("SDK SFX search popup and folder option", [] {
+        auto manager = GameManager::get();
+        AlphaTestField variables(manager->m_valueKeeper, CCDictionary::create());
+        auto pool = CCPoolManager::sharedPoolManager();
+        pool->push();
+        auto pop = [](CCPoolManager* value) { value->pop(); };
+        std::unique_ptr<CCPoolManager, decltype(pop)> scope(pool, pop);
+        for (bool initial : {false, true}) {
+            manager->setGameVariable("0147", initial);
+            auto query = std::string(48, 's');
+            auto popup = SearchSFXPopup::create(query);
+            if (!popup || sizeof(SearchSFXPopup) != 0x2f8 || !popup->m_input ||
+                popup->m_input->getString() != query || popup->m_value != query) return false;
+            CCMenuItemToggler* toggle = nullptr;
+            for (auto child : CCArrayExt<CCNode*>(popup->m_buttonMenu->getChildren())) {
+                if (auto item = typeinfo_cast<CCMenuItemToggler*>(child)) {
+                    if (toggle) return false;
+                    toggle = item;
+                }
+            }
+            if (!toggle || toggle->isToggled() != initial) return false;
+            for (bool expected : {!initial, initial}) {
+                toggle->activate();
+                if (manager->getGameVariable("0147") != expected || toggle->isToggled() != expected ||
+                    popup->m_input->getString() != query || popup->m_value != query) return false;
+            }
+            popup->onSearchFolders(nullptr);
+            if (manager->getGameVariable("0147") == initial) return false;
+            AlphaTextReceiver receiver;
+            popup->m_delegate = &receiver;
+            popup->onClose(nullptr);
+            if (receiver.popup != popup || receiver.text != query || popup->m_cancelled) return false;
+            popup->m_delegate = nullptr;
+            popup->cleanup();
+        }
+        return true;
     });
 
     runBindingTest("Native local level ordering", [] {

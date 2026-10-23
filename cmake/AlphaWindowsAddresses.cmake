@@ -78,6 +78,12 @@ alpha_patch_class(GeometryDash MusicDownloadManager "    void tryUpdateSFXLibrar
     "    void tryUpdateSFXLibrary() = win 0x48f410;")
 file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/MusicBrowser.cpp" alpha_music_browser_constructor)
 file(APPEND "${alpha_bindings_output}/inline/MusicBrowser.cpp" "\n${alpha_music_browser_constructor}")
+# The old Windows search-popup class was replaced by inline browser controls.
+# Keep its SDK API on the current SetTextPopup and shared folder-search option.
+alpha_patch_address(GeometryDash SearchSFXPopup "bool init(std::string query)" inline)
+alpha_patch_address(GeometryDash SearchSFXPopup "void onSearchFolders(cocos2d::CCObject* sender)" inline)
+file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/SearchSFXPopup.cpp" alpha_sfx_search_popup)
+file(APPEND "${alpha_bindings_output}/inline/SearchSFXPopup.cpp" "\n${alpha_sfx_search_popup}")
 
 # Native alert callbacks use this level deletion routine. Local editor levels
 # are removed from their own array; downloaded levels retain earned progress.

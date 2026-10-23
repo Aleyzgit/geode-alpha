@@ -142,6 +142,8 @@ $expected = @(
     'SDK profile construction boundary',
     'SDK time speed control allocation',
     'SDK music browser allocation',
+    'Buffered logger preserves complete messages',
+    'SDK SFX search popup and folder option',
     'Native music browser initialization and refresh',
     'Native ground async completion',
     'Native middleground async completion',

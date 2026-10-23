@@ -64,7 +64,7 @@ The Windows GameManager layout has also been corrected so native methods
 and SDK field access use the same game-variable and scene storage.
 The GJGameLevel layout and editor build statistics now use the newer upstream
 bindings, including corrected level-browser, slider and secret-level methods.
-**6 Windows native-address placeholders remain**
+**4 Windows native-address placeholders remain**
 in the pinned game declarations. The engine declarations have no remaining
 Windows placeholders. Additional unsafe or incorrect entries have been corrected,
 including PVR functions that previously pointed outside executable memory.
@@ -98,7 +98,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. The 164 native checks passed in both
+Windows validation used Clang 21.1.8. The 166 native checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -214,6 +214,9 @@ MusicBrowser reserves its native 0x398 bytes and uses the corrected initializer.
 Fixtures create ordinary, NCS and Chompo browsers, including through the SDK,
 and exercise refresh with isolated, already active requests. Library version
 checks and full downloads use their separate native routines.
+The former SFX search-popup API is supplied through the current text popup
+and shared folder-search preference. Logger writes preserve messages across
+buffer boundaries, and synchronous flush requests survive notification races.
 All 5,508 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test

@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 6 Windows address placeholders are in
+respective modules. The remaining 4 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -181,6 +181,19 @@ The native refresh callback is 0x47c280. Music/SFX version checks use
 separate active request markers for version checks, full downloads and URL
 lookup, verify duplicate suppression and test refresh's automatic/manual and
 missing-URL flags. They issue no library downloads or URL requests.
+The older SearchSFXPopup class has no native Windows RTTI in 2.2091. Its SDK
+API now uses the current SetTextPopup with the original Find SFX/Folder Name
+controls and the 0147 preference still read by native folder search. This is
+an SDK implementation, not a hookable native class or an old-DLL ABI bridge.
+A fixture checks both initial toggle states, real control activation, preserved
+heap-backed query text and delivery through SetTextPopupDelegate. Preferences
+are isolated and restored.
+Buffered logger writes now use writeAll, since a single write may stop at the
+internal buffer boundary. Flush requests are retained in an atomic counter
+outside the cancellable notification future. A 64-KiB message fixture calls
+the public synchronous flush and verifies the entire message in the log file.
+It previously reproduced a lost flush notification and timed out; both modes
+now complete without truncated validation lines.
 LevelTools::posForTimeInternal at 0x4676d0 has seven native arguments. The old
 eight-argument SDK overload forwards to it without the unused tail argument;
 the seven-argument overload provides the actual hook signature. Empty/null
@@ -226,7 +239,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-164 checks cover native constructors, level/list cache fixtures, fresh/expired
+166 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore

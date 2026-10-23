@@ -49,6 +49,7 @@ namespace geode::log {
         arc::CancellationToken m_cancel;
         arc::Notify m_syncFlushNotify;
         std::counting_semaphore<1024> m_syncFlushSemaphore{0};
+        std::atomic<size_t> m_syncFlushRequests{0};
         std::atomic<bool> m_usingThread = false;
 
         Logger();

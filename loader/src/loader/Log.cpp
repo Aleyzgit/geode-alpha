@@ -275,6 +275,8 @@ arc::Future<> Logger::workerThread() {
     size_t flushRequests = 0;
 
     while (running) {
+        // Keep requests outside the cancellable notification future.
+        flushRequests += m_syncFlushRequests.exchange(0);
         auto now = asp::Instant::now();
 
         if (now >= nextFlush || unflushed >= 64) {
@@ -301,7 +303,7 @@ arc::Future<> Logger::workerThread() {
 
             arc::selectee(
                 m_syncFlushNotify.notified(),
-                [&] { flushRequests++; }
+                [] {}
             ),
 
             // periodically flush
@@ -387,8 +389,8 @@ void Logger::outputLog(BorrowedLog const& log, bool dontFlush) {
         console::log(buf.c_str(), sev);
     }
     if (logFile && logModLevel && m_logStream) {
-        (void) m_logStream->write(buf.view());
-        (void) m_logStream->write("\n");
+        (void) m_logStream->writeAll(buf.view());
+        (void) m_logStream->writeAll("\n");
         // don't flush stream for every log as that's super slow
         if (!dontFlush) {
             this->flushLocked();
@@ -433,6 +435,7 @@ void Logger::flushExternal() {
     }
 
     // synchronize with the log thread
+    m_syncFlushRequests.fetch_add(1);
     m_syncFlushNotify.notifyOne();
     m_syncFlushSemaphore.acquire();
 }
