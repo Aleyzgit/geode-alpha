@@ -14,3 +14,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/mod.json.in ${CMAKE_CURRENT_SOURCE_DIR}/mod.json)
 setup_geode_mod(${PROJECT_NAME} DONT_INSTALL)
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    # Keep the JSON translation unit independent of the universal SDK PCH.
+    set_source_files_properties("${CPM_PACKAGE_json_SOURCE_DIR}/src/value.cpp"
+        PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+endif()

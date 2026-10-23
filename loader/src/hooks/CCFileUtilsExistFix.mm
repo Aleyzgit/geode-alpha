@@ -53,15 +53,28 @@ class $modify(CCFileUtilsExistFix, CCFileUtilsMac) {
 
 #ifdef GEODE_IS_IOS
 #include <Geode/cocos/platform/ios/CCFileUtilsIOS.h>
-#include <Geode/modify/CCFileUtilsIOS.hpp>
-class $modify(CCFileUtilsExistFix, CCFileUtilsIOS) {
-    static void onModify(auto& self) {
-        (void)self.setHookPriority("CCFileUtilsIOS::isFileExist", Priority::Replace);
-    }
+#include <Geode/utils/addresser.hpp>
 
-    bool isFileExist(const std::string& path) {
-        return isFileExistImpl(path);
+static bool isFileExistIOS(CCFileUtils*, std::string const& path) {
+    return isFileExistImpl(path);
+}
+
+$execute {
+    // Resolve the existing engine instance's virtual implementation. The iOS
+    // bindings do not provide a fixed address for the platform override.
+    auto fileUtils = CCFileUtils::sharedFileUtils();
+    if (!fileUtils) {
+        log::error("Unable to resolve iOS file existence hook: no file utilities instance");
+        return;
     }
-};
+    auto offset = addresser::getVirtualOffset(&CCFileUtils::isFileExist);
+    auto address = *reinterpret_cast<uintptr_t*>(*reinterpret_cast<uintptr_t*>(fileUtils) + offset);
+    auto hook = Mod::get()->hook(reinterpret_cast<void*>(address), &isFileExistIOS, "CCFileUtilsIOS::isFileExist");
+    if (!hook) {
+        log::error("Unable to install iOS file existence hook: {}", hook.unwrapErr());
+        return;
+    }
+    hook.unwrap()->setPriority(Priority::Replace);
+}
 #endif
 

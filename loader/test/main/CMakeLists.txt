@@ -13,3 +13,10 @@ target_link_libraries(TestMod TestDependency)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/mod.json.in ${CMAKE_CURRENT_SOURCE_DIR}/mod.json)
 setup_geode_mod(${PROJECT_NAME} DONT_INSTALL)
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    # Apple Clang crashes while loading the universal SDK PCH for this JSON
+    # translation unit. Compile the dependency from its own complete headers.
+    set_source_files_properties("${CPM_PACKAGE_json_SOURCE_DIR}/src/value.cpp"
+        PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+endif()
