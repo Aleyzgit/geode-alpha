@@ -3107,6 +3107,63 @@ $on_game(Loaded) {
             [](uint8_t byte) { return byte == 0xa5; });
     });
 
+    runBindingTest("SDK level settings allocation and container lifetimes", [] {
+        if (sizeof(LevelSettingsObject) != 0x2d8 || offsetof(LevelSettingsObject, m_unk1e8) != 0x1e8 ||
+            offsetof(LevelSettingsObject, m_idNames) != 0x208 ||
+            offsetof(LevelSettingsObject, m_idUseOrder) != 0x248 ||
+            offsetof(LevelSettingsObject, m_unk288) != 0x288 ||
+            offsetof(LevelSettingsObject, m_unk298) != 0x298 ||
+            offsetof(LevelSettingsObject, m_unk2c0) != 0x2c0) return false;
+        alignas(LevelSettingsObject) std::array<uint8_t, sizeof(LevelSettingsObject) + 32> storage;
+        storage.fill(0xa5);
+        auto settings = new (storage.data()) LevelSettingsObject();
+        bool valid = !settings->m_effectManager && settings->m_unk1e8.empty() &&
+            settings->m_idNames.empty() && settings->m_idUseOrder.empty() && settings->m_unk288.empty() &&
+            settings->m_unk298.empty() && settings->m_unk2c0.empty() && !settings->m_unk2b8 && !settings->m_unk2d0;
+        if (valid) {
+            settings->m_guidelineString.assign(128, 'a');
+            settings->m_unk1e8.assign(128, 'b');
+            settings->m_idNames[7][11] = std::string(128, 'c');
+            settings->m_idNames[13][17] = std::string(128, 'd');
+            settings->m_idUseOrder[7] = {11, 13, 17};
+            settings->m_unk288.emplace(19, std::string(128, 'e'));
+            settings->m_unk298.assign(128, 'f');
+            settings->m_unk2c0.insert(23);
+            settings->m_unk2c0.insert(29);
+        }
+        auto effects = std::make_unique<GJEffectManager>();
+        auto before = effects->retainCount();
+        effects->retain();
+        settings->m_effectManager = effects.get();
+        settings->LevelSettingsObject::~LevelSettingsObject();
+        return valid && effects->retainCount() == before &&
+            std::all_of(storage.begin() + sizeof(LevelSettingsObject), storage.end(),
+                [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("SDK level settings factory and native save roundtrip", [] {
+        if (sizeof(LevelSettingsObject) != 0x2d8) return false;
+        auto settings = LevelSettingsObject::create();
+        if (!settings || !settings->m_effectManager) return false;
+        settings->m_startMode = 1;
+        settings->m_startSpeed = Speed::Fast;
+        settings->m_startDual = true;
+        settings->m_twoPlayerMode = true;
+        settings->m_songOffset = 1.25f;
+        settings->m_backgroundIndex = 2;
+        settings->m_groundIndex = 3;
+        settings->m_fontIndex = 4;
+        settings->m_guidelineString = "0.5~1~1.0~0~";
+        auto serialized = settings->getSaveString();
+        if (serialized.empty()) return false;
+        auto restored = LevelSettingsObject::objectFromString(serialized);
+        return restored && restored->m_effectManager && restored->m_startMode == 1 &&
+            restored->m_startSpeed == Speed::Fast && restored->m_startDual && restored->m_twoPlayerMode &&
+            restored->m_songOffset == 1.25f && restored->m_backgroundIndex == 2 &&
+            restored->m_groundIndex == 3 && restored->m_fontIndex == 4 &&
+            restored->m_guidelineString == settings->m_guidelineString;
+    });
+
     runBindingTest("SDK comment lifetime and native score ownership", [] {
         if (sizeof(GJComment) != 0x1e0 || offsetof(GJComment, m_unk1cc) != 0x1cc ||
             offsetof(GJComment, m_unk1d0) != 0x1d0 || offsetof(GJComment, m_key15) != 0x1d4 ||

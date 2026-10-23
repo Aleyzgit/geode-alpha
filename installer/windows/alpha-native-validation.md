@@ -83,6 +83,17 @@ friend flag as well. Fixtures exercise these actual native parser branches,
 SDK creation, three heap strings and score ownership through SDK destruction
 and the native deleting destructor at 0x218e70 with flags zero.
 
+LevelSettingsObject reserves 0x2d8 bytes and uses native construction at 0x3ecac0.
+The added storage includes a string at 0x1e8, nested integer/string name tables
+at 0x208, integer/vector order tables at 0x248, an integer/string tree at 0x288,
+a string at 0x298 and an integer set at 0x2c0. Native allocation and container-node
+destruction establish these layouts. The deleting destructor at 0x3ecd40 receives
+flags zero through the SDK helper; constructor cleanup retains the usual Geode
+destructor-lock protocol. Guarded fixtures fill the nested containers and heap
+strings before native cleanup and verify effect-manager ownership. The SDK
+factory uses the real initializer, and native save/parse roundtrips preserve
+mode, speed, dual/two-player settings, song offset, indices and guidelines.
+
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
 particle draw-cost field puts the base size at 0x318; the additional tail
 pointer used on other platforms would exceed that native Windows allocation.
@@ -327,7 +338,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-179 checks cover native constructors, level/list cache fixtures, fresh/expired
+181 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore

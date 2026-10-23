@@ -160,6 +160,8 @@ $expected = @(
     'SDK audio changelog records and reinitialization',
     'SDK audio changelog storage through native destruction',
     'SDK comment lifetime and native score ownership',
+    'SDK level settings allocation and container lifetimes',
+    'SDK level settings factory and native save roundtrip',
     'Native comment dictionary fields and SDK factory',
     'Native registration password feedback and validation',
     'Native pause construction boundary and ownership',

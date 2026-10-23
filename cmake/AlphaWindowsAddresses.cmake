@@ -383,6 +383,33 @@ alpha_patch_class(GeometryDash GJBaseGameLayer "    float m_unk3380;"
     "    float m_unk3380;\n    win {\n    float m_audioSpeed;\n    }")
 file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/TimeSpeedControl.cpp" alpha_time_speed_constructor)
 file(WRITE "${alpha_bindings_output}/inline/TimeSpeedControl.cpp" "${alpha_time_speed_constructor}")
+
+# Native level settings construct nested ID-name/order tables and additional
+# strings/trees after the older scalar fields. Their destructor reserves 0x2d8.
+alpha_patch_class(GeometryDash LevelSettingsObject "    virtual ~LevelSettingsObject()"
+    "    LevelSettingsObject() = win 0x3ecac0;\n    virtual ~LevelSettingsObject()")
+alpha_patch_class(GeometryDash LevelSettingsObject "    static LevelSettingsObject* create();"
+    "    static LevelSettingsObject* create() = win inline;")
+alpha_patch_class(GeometryDash LevelSettingsObject "    bool m_enableImpulseFix;"
+    [=[    bool m_enableImpulseFix;
+    bool m_unk1d5;
+    bool m_unk1d6;
+    bool m_unk1d7;
+    bool m_unk1d8;
+    bool m_unk1d9;
+    int m_unk1dc;
+    int m_unk1e0;
+    int m_unk1e4;
+    std::string m_unk1e8;
+    std::unordered_map<int, std::unordered_map<int, std::string>> m_idNames;
+    std::unordered_map<int, std::vector<int>> m_idUseOrder;
+    std::map<int, std::string> m_unk288;
+    std::string m_unk298;
+    int m_unk2b8;
+    std::set<int> m_unk2c0;
+    int m_unk2d0;]=])
+file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/LevelSettingsObject.cpp" alpha_level_settings_factory)
+file(APPEND "${alpha_bindings_output}/inline/LevelSettingsObject.cpp" "\n${alpha_level_settings_factory}")
 # GameManager::recountUserStats inlines this 43-level set in Windows 2.2091.
 # Keep the SDK's owning return value instead of binding an interior address.
 alpha_patch_address(GeometryDash LevelTools "static std::unordered_set<int> getLevelList()" inline)
@@ -1397,6 +1424,7 @@ if (WIN32)
     alpha_patch_deleting_destructor(MusicBrowser 0x479ee0)
     alpha_patch_deleting_destructor(SFXBrowser 0x6164e0)
     alpha_patch_deleting_destructor(SFXInfoObject 0x480bc0)
+    alpha_patch_deleting_destructor(LevelSettingsObject 0x3ecd40)
 endif()
 
 # Options factories allocate 0x78 and 0x300. The native row reads its count at
