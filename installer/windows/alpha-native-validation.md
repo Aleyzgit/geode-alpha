@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 8 Windows address placeholders are in
+respective modules. The remaining 6 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,504 populated native wrappers, all pointing into executable sections of
+5,508 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -167,6 +167,20 @@ The gold-chest action sequence schedules SecretRewardsLayer::fadeInOutMusic
 at 0x56d520. Its fixture uses an isolated silent FMOD channel and verifies the
 two-second 0.2-to-1.0 fade, replacement of old fade points and an untouched
 second channel, including when the target music entry is absent.
+MusicBrowser reserves 0x398 bytes. Search input/background/clear controls are
+at 0x308/0x310/0x318, search visibility/branding at 0x320/0x328, view buttons
+at 0x340/0x348/0x350, loading circle at 0x358 and song ID at 0x360. Playback
+controls remain at 0x378/0x380/0x388. Its initializer is 0x47a340, as called by
+the native factory; the old 0xf6b60 address belongs to a different class.
+SDK construction initializes all fields, and the scalar deleting destructor
+at 0x479ee0 receives deletion flags zero. Guarded construction checks ownership
+of the retained search result. Native and SDK initialization fixtures create
+ordinary, NCS and Chompo (type 2) browsers with isolated empty libraries.
+The native refresh callback is 0x47c280. Music/SFX version checks use
+0x48c6b0/0x48f410; full library downloads use 0x48ca90/0x48f820. Fixtures supply
+separate active request markers for version checks, full downloads and URL
+lookup, verify duplicate suppression and test refresh's automatic/manual and
+missing-URL flags. They issue no library downloads or URL requests.
 LevelTools::posForTimeInternal at 0x4676d0 has seven native arguments. The old
 eight-argument SDK overload forwards to it without the unused tail argument;
 the seven-argument overload provides the actual hook signature. Empty/null
@@ -212,7 +226,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-162 checks cover native constructors, level/list cache fixtures, fresh/expired
+164 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -347,7 +361,7 @@ pointer fields and paged-popup storage are used without duplicate padding.
 TabbedPopupLayer's Windows tail remains the verified 0x48 bytes.
 
 A separate compiled-size comparison covers all 548 upstream Windows references.
-It reports 131 differences requiring native verification; these are not a list
+It reports 130 differences requiring native verification; these are not a list
 of proven defects because some reference sizes are inconsistent with native
 construction. For example, GameManager's fields start before the reference's
 claimed GManager size. No automatic padding is applied from this comparison.

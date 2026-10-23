@@ -2726,6 +2726,75 @@ $on_game(Loaded) {
         });
     });
 
+    runBindingTest("SDK music browser allocation", [] {
+        alignas(MusicBrowser) std::array<uint8_t, sizeof(MusicBrowser) + 32> storage;
+        storage.fill(0xa5);
+        auto browser = new (storage.data()) MusicBrowser;
+        auto valid = sizeof(MusicBrowser) == 0x398 && offsetof(MusicBrowser, m_searchInput) == 0x308 &&
+            offsetof(MusicBrowser, m_circleSprite) == 0x358 && offsetof(MusicBrowser, m_songID) == 0x360 &&
+            offsetof(MusicBrowser, m_playButton) == 0x388 && !browser->m_searchResult &&
+            !browser->m_searchInput && !browser->m_searchBackground && !browser->m_searchVisible &&
+            !browser->m_brandSprite && !browser->m_downloadedViewButton && !browser->m_favoriteViewButton &&
+            !browser->m_levelViewButton && !browser->m_autoUpdating;
+        auto search = MusicSearchResult::create(GJSongType::Music);
+        search->retain();
+        browser->m_searchResult = search;
+        browser->~MusicBrowser();
+        return valid && search->retainCount() == 1 &&
+            std::all_of(storage.begin() + sizeof(MusicBrowser), storage.end(),
+                [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native music browser initialization and refresh", [] {
+        auto manager = MusicDownloadManager::sharedState();
+        AlphaTestField downloads(manager->m_activeDownloads, CCDictionary::create());
+        AlphaTestField delegates(manager->m_musicDownloadDelegates, CCArray::create());
+        AlphaTestField objects(manager->m_musicObjects, CCDictionary::create());
+        AlphaTestField artists(manager->m_musicArtists, CCDictionary::create());
+        AlphaTestField url(manager->m_customContentURL, std::string("https://alpha.invalid/"));
+        AlphaTestField downloading(manager->m_downloadingMusicLibrary, true);
+        AlphaTestField count(manager->m_musicObjectCount, 0);
+        AlphaTestField ncsCount(manager->m_ncsSongCount, 0);
+        auto marker = CCNode::create();
+        for (auto key : {"v_music_l", "v_sfx_l", "dl_music_l", "dl_sfx_l", "get_c_url"}) {
+            manager->m_activeDownloads->setObject(marker, key);
+        }
+        auto pool = CCPoolManager::sharedPoolManager();
+        pool->push();
+        auto pop = [](CCPoolManager* value) { value->pop(); };
+        std::unique_ptr<CCPoolManager, decltype(pop)> scope(pool, pop);
+        for (auto type : {GJSongType::Music, GJSongType::NCS, GJSongType::Chompo}) {
+            auto browser = MusicBrowser::create(0, type);
+            if (!browser || browser->m_songType != type || !browser->m_searchResult || !browser->m_pageLabel ||
+                !browser->m_searchInput || !browser->m_clearSearchTextButton || !browser->m_circleSprite ||
+                !browser->m_playSlider || !browser->m_playLabel || !browser->m_playButton ||
+                std::string(browser->m_pageLabel->getString()) != "No matches") return false;
+            browser->onUpdateLibrary(nullptr);
+            if (!browser->m_autoUpdating || browser->m_gettingURL) return false;
+            browser->onUpdateLibrary(marker);
+            if (browser->m_autoUpdating || browser->m_gettingURL) return false;
+            manager->m_customContentURL.clear();
+            browser->onUpdateLibrary(marker);
+            if (!browser->m_gettingURL || browser->m_autoUpdating) return false;
+            manager->m_customContentURL = "https://alpha.invalid/";
+            browser->cleanup();
+        }
+        auto sdkBrowser = std::make_unique<MusicBrowser>();
+        auto valid = sdkBrowser->init(0, GJSongType::Music) && sdkBrowser->m_searchResult &&
+            sdkBrowser->m_playSlider && sdkBrowser->m_pageLabel;
+        sdkBrowser->cleanup();
+        manager->downloadMusicLibrary();
+        manager->downloadSFXLibrary();
+        manager->tryUpdateMusicLibrary();
+        manager->tryUpdateSFXLibrary();
+        return valid && manager->m_activeDownloads->count() == 5 &&
+            manager->m_activeDownloads->objectForKey("dl_music_l") == marker &&
+            manager->m_activeDownloads->objectForKey("dl_sfx_l") == marker &&
+            manager->m_activeDownloads->objectForKey("v_music_l") == marker &&
+            manager->m_activeDownloads->objectForKey("v_sfx_l") == marker &&
+            manager->m_activeDownloads->objectForKey("get_c_url") == marker;
+    });
+
     runBindingTest("SDK time speed control allocation", [] {
         alignas(TimeSpeedControl) std::array<uint8_t, sizeof(TimeSpeedControl) + 32> storage;
         storage.fill(0xa5);

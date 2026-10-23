@@ -141,6 +141,8 @@ $expected = @(
     'Native browser page and folder labels',
     'SDK profile construction boundary',
     'SDK time speed control allocation',
+    'SDK music browser allocation',
+    'Native music browser initialization and refresh',
     'Native ground async completion',
     'Native middleground async completion',
     'Native treasure room music fade',

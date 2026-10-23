@@ -37,6 +37,14 @@ if (NOT GEODE_BINDINGS_PATH)
     # Generated state headers use arrays, maps and cocos value types without
     # direct includes. Keep them valid independently of unity source ordering.
     set(alpha_enums "#include <array>\n#include <map>\n#include <Geode/cocos/include/ccTypes.h>\n${alpha_enums}")
+    set(alpha_song_types "enum class GJSongType {\n    Music = -1,\n    NCS = 1,\n};")
+    string(FIND "${alpha_enums}" "${alpha_song_types}" alpha_song_types_match)
+    if (alpha_song_types_match LESS 0)
+        message(FATAL_ERROR "Unexpected upstream GJSongType enum")
+    endif()
+    string(REPLACE "${alpha_song_types}"
+        "enum class GJSongType {\n    Music = -1,\n    NCS = 1,\n#ifdef GEODE_IS_WINDOWS\n    Chompo = 2,\n#endif\n};"
+        alpha_enums "${alpha_enums}")
     string(REGEX MATCH "enum class UserListType \\{[^}]*\\};" alpha_old_user_lists "${alpha_enums}")
     if (NOT alpha_old_user_lists)
         message(FATAL_ERROR "Missing upstream UserListType enum")

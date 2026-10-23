@@ -59,6 +59,26 @@ alpha_patch_class(GeometryDash EditorUI
     "    void updateZoom(float zoom, cocos2d::CCPoint anchor) = win 0x1b4c70;")
 alpha_patch_address(GeometryDash LevelEditorLayer "void updateGridLayerParent()" 0x3ef7a0)
 
+# Native MusicBrowser construction reserves 0x398. Search controls, branding
+# and view buttons were added between the older SDK's existing fields.
+alpha_patch_class(GeometryDash MusicBrowser "    virtual ~MusicBrowser()"
+    "    MusicBrowser() = win inline;\n    virtual ~MusicBrowser()")
+alpha_patch_class(GeometryDash MusicBrowser "    CCMenuItemSpriteExtra* m_clearSearchButton;"
+    "    CCMenuItemSpriteExtra* m_clearSearchButton;\n    CCTextInputNode* m_searchInput;\n    cocos2d::extension::CCScale9Sprite* m_searchBackground;\n    CCMenuItemSpriteExtra* m_clearSearchTextButton;\n    bool m_searchVisible;\n    cocos2d::CCSprite* m_brandSprite;")
+alpha_patch_class(GeometryDash MusicBrowser "    CCMenuItemSpriteExtra* m_artistFilterButton;"
+    "    CCMenuItemSpriteExtra* m_artistFilterButton;\n    CCMenuItemSpriteExtra* m_downloadedViewButton;\n    CCMenuItemSpriteExtra* m_favoriteViewButton;\n    CCMenuItemSpriteExtra* m_levelViewButton;")
+alpha_patch_address(GeometryDash MusicBrowser "bool init(int songID, GJSongType songType)" 0x47a340 0xf6b60)
+alpha_patch_address(GeometryDash MusicBrowser "void onUpdateLibrary(cocos2d::CCObject* sender)" 0x47c280)
+alpha_patch_class(GeometryDash MusicDownloadManager "    void downloadMusicLibrary();"
+    "    void downloadMusicLibrary() = win 0x48ca90;")
+alpha_patch_address(GeometryDash MusicDownloadManager "void downloadSFXLibrary()" 0x48f820)
+alpha_patch_class(GeometryDash MusicDownloadManager "    void tryUpdateMusicLibrary() = imac"
+    "    void tryUpdateMusicLibrary() = win 0x48c6b0, imac")
+alpha_patch_class(GeometryDash MusicDownloadManager "    void tryUpdateSFXLibrary();"
+    "    void tryUpdateSFXLibrary() = win 0x48f410;")
+file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/MusicBrowser.cpp" alpha_music_browser_constructor)
+file(APPEND "${alpha_bindings_output}/inline/MusicBrowser.cpp" "\n${alpha_music_browser_constructor}")
+
 # Native alert callbacks use this level deletion routine. Local editor levels
 # are removed from their own array; downloaded levels retain earned progress.
 alpha_patch_address(GeometryDash GameLevelManager
@@ -1183,6 +1203,7 @@ if (WIN32)
     alpha_patch_deleting_destructor(FindObjectPopup 0x180260)
     alpha_patch_deleting_destructor(PauseLayer 0x4d6600)
     alpha_patch_deleting_destructor(TimeSpeedControl 0x47080 PRESERVE_INLINE)
+    alpha_patch_deleting_destructor(MusicBrowser 0x479ee0)
 endif()
 
 # Options factories allocate 0x78 and 0x300. The native row reads its count at
