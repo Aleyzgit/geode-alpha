@@ -107,6 +107,7 @@ size_t CCFileUtils::getTexturePackCount() {
 
 #pragma warning(pop)
 
+#ifndef GEODE_IS_IOS
 struct FileUtilsUpdatePaths : Modify<FileUtilsUpdatePaths, CCFileUtils> {
     static CCFileUtils* sharedFileUtils() {
         static bool doAddPaths = true;
@@ -134,3 +135,36 @@ struct FileUtilsUpdatePaths : Modify<FileUtilsUpdatePaths, CCFileUtils> {
         return CCFileUtils::fullPathForFilename(filename, unk);
     }
 };
+#else
+#include <Geode/utils/addresser.hpp>
+
+static uintptr_t s_fullPathAddress = 0;
+
+static std::string fullPathForFilenameIOS(CCFileUtils* fileUtils, char const* filename, bool skipSuffix) {
+    if (std::string_view(filename) == "cc_2x2_white_image") {
+        return filename;
+    }
+    // Like other raw Geode hooks, re-entering the target from the detour calls
+    // the next handler, preserving the engine's original path resolution.
+    using FunctionType = std::string(*)(CCFileUtils*, char const*, bool);
+    return reinterpret_cast<FunctionType>(s_fullPathAddress)(fileUtils, filename, skipSuffix);
+}
+
+$execute {
+    auto fileUtils = CCFileUtils::sharedFileUtils();
+    if (!fileUtils) {
+        log::error("Unable to initialize iOS resource paths: no file utilities instance");
+        return;
+    }
+    // The previous singleton hook only initialized the paths on its first call.
+    // Resolve that same live instance directly when fixed iOS addresses are absent.
+    fileUtils->updatePaths();
+    auto offset = addresser::getVirtualOffset(&CCFileUtils::fullPathForFilename);
+    s_fullPathAddress = *reinterpret_cast<uintptr_t*>(*reinterpret_cast<uintptr_t*>(fileUtils) + offset);
+    auto hook = Mod::get()->hook(reinterpret_cast<void*>(s_fullPathAddress), &fullPathForFilenameIOS,
+        "CCFileUtils::fullPathForFilename");
+    if (!hook) {
+        log::error("Unable to install iOS resource path hook: {}", hook.unwrapErr());
+    }
+}
+#endif
