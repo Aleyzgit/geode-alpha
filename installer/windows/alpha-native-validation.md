@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,512 populated native wrappers, all pointing into executable sections of
+5,513 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -204,6 +204,16 @@ parser writes its dictionary at 0x198, artist/changelog arrays at 0x1a0/0x1a8
 and version/object counters at 0x1b0/0x1b4. SDK fields now use those positions.
 Previously the fixture placed an array where native search expected a
 dictionary and reproduced a crash at 0x490be9. Both modes now complete cleanly.
+SFXInfoObject reserves 0xb0 bytes, including lowercase and additional strings
+at 0x70/0x90. Native construction at 0x480b30 initializes all three strings and
+the status at 0x4c; initialization at 0x4977a0 also fills the lowercase cache
+read directly by native search. The scalar deleting destructor at 0x480bc0
+receives deletion flags zero. SFXFolderObject's owned array is at 0xb0 and its
+allocation is 0xb8. SDK folder initialization now sets m_folder to true.
+Guarded fixtures destroy heap-backed strings and check folder-array ownership.
+A separate fixture creates an SDK folder and sound, checks dictionary/folder
+lookup and filtered enumeration, then finds the sound through native search.
+All libraries, preference dictionaries and objects are temporary.
 Buffered logger writes now use writeAll, since a single write may stop at the
 internal buffer boundary. Flush requests are retained in an atomic counter
 outside the cancellable notification future. A 64-KiB message fixture calls
@@ -255,7 +265,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-168 checks cover native constructors, level/list cache fixtures, fresh/expired
+170 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -390,7 +400,7 @@ pointer fields and paged-popup storage are used without duplicate padding.
 TabbedPopupLayer's Windows tail remains the verified 0x48 bytes.
 
 A separate compiled-size comparison covers all 548 upstream Windows references.
-It reports 129 differences requiring native verification; these are not a list
+It reports 127 differences requiring native verification; these are not a list
 of proven defects because some reference sizes are inconsistent with native
 construction. For example, GameManager's fields start before the reference's
 claimed GManager size. No automatic padding is applied from this comparison.

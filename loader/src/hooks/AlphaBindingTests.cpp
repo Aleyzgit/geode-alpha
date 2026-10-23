@@ -88,6 +88,8 @@
 #include <Geode/binding/ReportQueuePopup.hpp>
 #include <Geode/binding/SFXBrowser.hpp>
 #include <Geode/binding/SFXSearchResult.hpp>
+#include <Geode/binding/SFXFolderObject.hpp>
+#include <Geode/binding/SFXInfoObject.hpp>
 #include <Geode/binding/ShaderLayer.hpp>
 #include <Geode/binding/SecretRewardsLayer.hpp>
 #include <Geode/binding/SongInfoObject.hpp>
@@ -2773,6 +2775,65 @@ $on_game(Loaded) {
             }
             return affectedByPortals;
         });
+    });
+
+    runBindingTest("SDK SFX metadata lifetimes", [] {
+        auto check = []<class T> {
+            alignas(T) std::array<uint8_t, sizeof(T) + 32> storage;
+            storage.fill(0xa5);
+            auto object = new (storage.data()) T;
+            uint32_t nativeState = 0;
+            std::memcpy(&nativeState, reinterpret_cast<uint8_t*>(object) + 0x4c, sizeof(nativeState));
+            auto valid = sizeof(SFXInfoObject) == 0xb0 && sizeof(SFXFolderObject) == 0xb8 &&
+                offsetof(SFXInfoObject, m_folder) == 0x48 && offsetof(SFXInfoObject, m_lowerCaseName) == 0x70 &&
+                offsetof(SFXInfoObject, m_unk090) == 0x90 && offsetof(SFXFolderObject, m_sfxObjects) == 0xb0 &&
+                object->m_name.empty() && object->m_lowerCaseName.empty() && object->m_unk090.empty() && nativeState == 0;
+            object->m_name = std::string(128, 'a');
+            object->m_lowerCaseName = std::string(128, 'b');
+            object->m_unk090 = std::string(128, 'c');
+            CCArray* children = nullptr;
+            if constexpr (std::is_same_v<T, SFXFolderObject>) {
+                valid = valid && !object->m_sfxObjects;
+                children = CCArray::create();
+                children->retain();
+                object->m_sfxObjects = children;
+            }
+            object->~T();
+            return valid && (!children || children->retainCount() == 1) &&
+                std::all_of(storage.begin() + sizeof(T), storage.end(), [](uint8_t byte) { return byte == 0xa5; });
+        };
+        return check.template operator()<SFXInfoObject>() && check.template operator()<SFXFolderObject>();
+    });
+
+    runBindingTest("SDK SFX metadata through native search", [] {
+        auto manager = MusicDownloadManager::sharedState();
+        AlphaTestField objects(manager->m_sfxObjects, CCDictionary::create());
+        AlphaTestField artists(manager->m_sfxArtists, CCArray::create());
+        AlphaTestField changelog(manager->m_sfxChangelog, CCArray::create());
+        AlphaTestField count(manager->m_sfxObjectCount, 1);
+        AlphaTestField variables(GameManager::get()->m_valueKeeper, CCDictionary::create());
+        auto pool = CCPoolManager::sharedPoolManager();
+        pool->push();
+        auto pop = [](CCPoolManager* value) { value->pop(); };
+        std::unique_ptr<CCPoolManager, decltype(pop)> scope(pool, pop);
+        auto folder = SFXFolderObject::create(717170, "Alpha folder", 0);
+        auto sound = SFXInfoObject::create(717171, "Alpha Metadata Sound", 717170, 2, 3);
+        if (!folder || !sound || !folder->m_folder || sound->m_folder || !folder->m_sfxObjects) return false;
+        manager->storeSFXInfoObject(folder);
+        manager->storeSFXInfoObject(sound);
+        if (!manager->isSFXLibraryLoaded() || manager->getSFXObject(717171) != sound ||
+            manager->getSFXFolderObjectForID(717171) != folder || folder->m_sfxObjects->count() != 1 ||
+            folder->m_sfxObjects->objectAtIndex(0) != sound || manager->getAllSFXObjects(true)->count() != 1 ||
+            manager->getAllSFXObjects(false)->count() != 2 || sound->getLowerCaseName() != "alpha metadata sound" ||
+            sound->m_lowerCaseName != "alpha metadata sound") {
+            return false;
+        }
+        auto search = SFXSearchResult::create(0);
+        if (!search) return false;
+        search->m_searchQuery = "alpha metadata";
+        search->updateObjects(AudioSortType::NameAscending);
+        return search->m_filterObjects && search->m_filterObjects->count() == 1 &&
+            search->m_filterObjects->objectAtIndex(0) == sound;
     });
 
     runBindingTest("SDK SFX browser allocation", [] {

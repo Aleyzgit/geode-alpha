@@ -160,6 +160,34 @@ alpha_patch_class(GeometryDash SFXBrowser [=[    SFXSearchResult* m_searchResult
     SFXBrowserDelegate* m_delegate;
     bool m_autoUpdating;]=])
 file(WRITE "${alpha_bindings_output}/inline/SFXBrowser.cpp" "")
+# Native SFX metadata destruction releases three strings, including caches at
+# 0x70/0x90. Folder arrays follow the complete 0xb0-byte metadata base.
+alpha_patch_class(GeometryDash SFXInfoObject "SFXInfoObject() = inline" "SFXInfoObject() = win 0x480b30")
+alpha_patch_class(GeometryDash SFXInfoObject "    std::string m_name;"
+    "    std::string m_name;\n    std::string m_lowerCaseName;\n    std::string m_unk090;")
+alpha_patch_address(GeometryDash SFXInfoObject
+    "bool init(int id, std::string name, int folderID, int size, int duration)" 0x4977a0 inline)
+set(alpha_sfx_info_path "${alpha_bindings_output}/inline/SFXInfoObject.cpp")
+file(READ "${alpha_sfx_info_path}" alpha_sfx_info_source)
+set(alpha_sfx_info_old_constructor "SFXInfoObject::SFXInfoObject() {\n    m_sfxID = 0;\n    m_folderID = 0;\n    m_size = 0;\n    m_duration = 0;\n    m_folder = false;\n    m_unk049 = false;\n}")
+string(FIND "${alpha_sfx_info_source}" "${alpha_sfx_info_old_constructor}" alpha_sfx_info_match)
+if (alpha_sfx_info_match LESS 0)
+    message(FATAL_ERROR "Unexpected SFXInfoObject constructor")
+endif()
+string(REPLACE "${alpha_sfx_info_old_constructor}" "" alpha_sfx_info_source "${alpha_sfx_info_source}")
+string(REPLACE "#if defined(GEODE_IS_WINDOWS) || defined(GEODE_IS_IOS)" "#if defined(GEODE_IS_IOS)"
+    alpha_sfx_info_source "${alpha_sfx_info_source}")
+file(WRITE "${alpha_sfx_info_path}" "${alpha_sfx_info_source}")
+set(alpha_sfx_folder_path "${alpha_bindings_output}/inline/SFXFolderObject.cpp")
+file(READ "${alpha_sfx_folder_path}" alpha_sfx_folder_source)
+set(alpha_sfx_folder_init "    if (!SFXInfoObject::init(id, name, folderID, 0, 0)) return false;")
+string(FIND "${alpha_sfx_folder_source}" "${alpha_sfx_folder_init}" alpha_sfx_folder_match)
+if (alpha_sfx_folder_match LESS 0)
+    message(FATAL_ERROR "Unexpected SFXFolderObject initializer")
+endif()
+string(REPLACE "${alpha_sfx_folder_init}" "${alpha_sfx_folder_init}\n    m_folder = true;"
+    alpha_sfx_folder_source "${alpha_sfx_folder_source}")
+file(WRITE "${alpha_sfx_folder_path}" "${alpha_sfx_folder_source}")
 
 # Native alert callbacks use this level deletion routine. Local editor levels
 # are removed from their own array; downloaded levels retain earned progress.
@@ -1290,6 +1318,7 @@ if (WIN32)
     alpha_patch_deleting_destructor(TimeSpeedControl 0x47080 PRESERVE_INLINE)
     alpha_patch_deleting_destructor(MusicBrowser 0x479ee0)
     alpha_patch_deleting_destructor(SFXBrowser 0x6164e0)
+    alpha_patch_deleting_destructor(SFXInfoObject 0x480bc0)
 endif()
 
 # Options factories allocate 0x78 and 0x300. The native row reads its count at

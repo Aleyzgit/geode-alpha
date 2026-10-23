@@ -143,6 +143,8 @@ $expected = @(
     'SDK time speed control allocation',
     'SDK music browser allocation',
     'SDK SFX browser allocation',
+    'SDK SFX metadata lifetimes',
+    'SDK SFX metadata through native search',
     'Native SFX browser initialization and refresh',
     'Buffered logger preserves complete messages',
     'SDK SFX search popup and folder option',
