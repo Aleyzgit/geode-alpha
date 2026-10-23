@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 13 Windows address placeholders are in
+respective modules. The remaining 8 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,499 populated native wrappers, all pointing into executable sections of
+5,504 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -158,6 +158,15 @@ previous alignment padding without moving later fields. A fresh editor fixture
 activates the real thumb/toggle controls, checks one-decimal speed rounding and
 label text, audio-speed independence and SDK construction/initialization.
 The 0183 preference dictionary is isolated and no real level is modified.
+GameManager's ground callbacks at 0x27e1e0/0x27e220 and middleground callbacks
+at 0x27df80/0x27dfc0 wait for both textures before reading the texture tag and
+calling shared completion. Fixtures test both arrival orders and duplicate
+first callbacks, using temporary flags/IDs and no active game layer. They do
+not enqueue texture loads or remove existing cached textures.
+The gold-chest action sequence schedules SecretRewardsLayer::fadeInOutMusic
+at 0x56d520. Its fixture uses an isolated silent FMOD channel and verifies the
+two-second 0.2-to-1.0 fade, replacement of old fade points and an untouched
+second channel, including when the target music entry is absent.
 LevelTools::posForTimeInternal at 0x4676d0 has seven native arguments. The old
 eight-argument SDK overload forwards to it without the unused tail argument;
 the seven-argument overload provides the actual hook signature. Empty/null
@@ -203,7 +212,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-159 checks cover native constructors, level/list cache fixtures, fresh/expired
+162 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore

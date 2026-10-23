@@ -88,6 +88,7 @@
 #include <Geode/binding/ReportQueuePopup.hpp>
 #include <Geode/binding/SFXBrowser.hpp>
 #include <Geode/binding/ShaderLayer.hpp>
+#include <Geode/binding/SecretRewardsLayer.hpp>
 #include <Geode/binding/SongInfoObject.hpp>
 #include <Geode/binding/StartPosObject.hpp>
 #include <Geode/binding/SpriteAnimationManager.hpp>
@@ -469,6 +470,38 @@ namespace {
             counts->valueForKey("alpha-sentinel")->intValue() != 44 || counts->count() != 3) return false;
         counts->setObject(CCString::create("invalid"), "page_3");
         return popup->countForPage(3) == 0 && counts->count() == 3;
+    }
+
+    bool checkAsyncGroundCompletion(bool middleground) {
+        auto manager = GameManager::get();
+        AlphaTestField gameLayer(manager->m_gameLayer, static_cast<GJBaseGameLayer*>(nullptr));
+        auto& loaded = middleground ? manager->m_loadedMG : manager->m_loadedGroundID;
+        auto& loading = middleground ? manager->m_loadingG1 : manager->m_loadingG;
+        auto& firstDone = middleground ? manager->m_finishedLoadingMG1 : manager->m_finishedLoadingG1;
+        auto& secondDone = middleground ? manager->m_finishedLoadingMG2 : manager->m_finishedLoadingG2;
+        AlphaTestField loadedState(loaded, 0);
+        AlphaTestField loadingState(loading, true);
+        AlphaTestField firstState(firstDone, false);
+        AlphaTestField secondState(secondDone, false);
+        auto first = middleground ? &GameManager::finishedLoadingMGAsync1 : &GameManager::finishedLoadingGAsync1;
+        auto second = middleground ? &GameManager::finishedLoadingMGAsync2 : &GameManager::finishedLoadingGAsync2;
+        auto texture = CCNode::create();
+        texture->setTag(middleground ? 3 : 17);
+        for (bool reverse : {false, true}) {
+            loaded = 0;
+            loading = true;
+            firstDone = false;
+            secondDone = false;
+            auto initial = reverse ? second : first;
+            auto final = reverse ? first : second;
+            for (int repeat = 0; repeat < 2; ++repeat) {
+                (manager->*initial)(nullptr);
+                if (!loading || loaded != 0 || firstDone != !reverse || secondDone != reverse) return false;
+            }
+            (manager->*final)(texture);
+            if (loading || loaded != texture->getTag() || !firstDone || !secondDone) return false;
+        }
+        return true;
     }
 
     template <class F>
@@ -2058,6 +2091,31 @@ $on_game(Loaded) {
             return second->getPaused(&paused) == FMOD_OK && paused;
         });
     });
+
+    runBindingTest("Native treasure room music fade", [] {
+        return withNativeMusicChannels([](FMODAudioEngine* engine, FMOD::Channel* first, FMOD::Channel* second) {
+            auto layer = std::make_unique<SecretRewardsLayer>();
+            layer->fadeInOutMusic();
+            auto music = engine->m_fmodMusic.extract(717171);
+            music.key() = 0;
+            engine->m_fmodMusic.insert(std::move(music));
+            for (int repeat = 0; repeat < 2; ++repeat) {
+                layer->fadeInOutMusic();
+                unsigned int count = 2;
+                std::array<unsigned long long, 2> clocks{};
+                std::array<float, 2> volumes{};
+                if (first->getFadePoints(&count, clocks.data(), volumes.data()) != FMOD_OK || count != 2 ||
+                    clocks[1] <= clocks[0] || std::abs(volumes[0] - .2f) > .001f || volumes[1] != 1.f ||
+                    std::abs(double(clocks[1] - clocks[0]) / engine->m_sampleRate - 2.) > .01) return false;
+                unsigned int other = 0;
+                if (second->getFadePoints(&other, nullptr, nullptr) != FMOD_OK || other != 0) return false;
+            }
+            return true;
+        });
+    });
+
+    runBindingTest("Native ground async completion", [] { return checkAsyncGroundCompletion(false); });
+    runBindingTest("Native middleground async completion", [] { return checkAsyncGroundCompletion(true); });
 
     runBindingTest("Native audio mixer restart", [] {
         auto engine = FMODAudioEngine::sharedEngine();

@@ -67,6 +67,18 @@ alpha_patch_address(GeometryDash GameLevelManager
 # update. ItemInfoPopup's factory allocates 0x2a8 and calls its bound init.
 alpha_patch_address(GeometryDash GameManager
     "void completedAchievement(std::string key)" 0x278140)
+# Each async texture pair waits for both callbacks before reading the texture
+# tag and tail-calling the shared ground or middleground completion routine.
+alpha_patch_address(GeometryDash GameManager
+    "void finishedLoadingGAsync1(cocos2d::CCObject* obj)" 0x27e1e0)
+alpha_patch_address(GeometryDash GameManager
+    "void finishedLoadingGAsync2(cocos2d::CCObject* obj)" 0x27e220)
+alpha_patch_address(GeometryDash GameManager
+    "void finishedLoadingMGAsync1(cocos2d::CCObject* obj)" 0x27df80)
+alpha_patch_address(GeometryDash GameManager
+    "void finishedLoadingMGAsync2(cocos2d::CCObject* obj)" 0x27dfc0)
+# The native gold-chest action sequence schedules this two-second music fade.
+alpha_patch_address(GeometryDash SecretRewardsLayer "void fadeInOutMusic()" 0x56d520)
 alpha_patch_address(GeometryDash ItemInfoPopup
     "static ItemInfoPopup* create(int id, UnlockType type)" 0x3841e0)
 alpha_patch_address(GeometryDash UIButtonConfig "void resetOneBtn()" 0x275970)
@@ -136,7 +148,7 @@ alpha_patch_class(GeometryDash TimeSpeedControl "    TodoReturn timeSliderChange
 alpha_patch_class(GeometryDash GJBaseGameLayer "    float m_unk3380;"
     "    float m_unk3380;\n    win {\n    float m_audioSpeed;\n    }")
 file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/TimeSpeedControl.cpp" alpha_time_speed_constructor)
-file(APPEND "${alpha_bindings_output}/inline/TimeSpeedControl.cpp" "\n${alpha_time_speed_constructor}")
+file(WRITE "${alpha_bindings_output}/inline/TimeSpeedControl.cpp" "${alpha_time_speed_constructor}")
 # GameManager::recountUserStats inlines this 43-level set in Windows 2.2091.
 # Keep the SDK's owning return value instead of binding an interior address.
 alpha_patch_address(GeometryDash LevelTools "static std::unordered_set<int> getLevelList()" inline)
