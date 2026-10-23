@@ -30,7 +30,7 @@ if (NOT GEODE_BINDINGS_PATH)
 
     file(CONFIGURE OUTPUT "${alpha_bindings_output}/GeometryDash.bro"
         CONTENT "${alpha_bindings}" @ONLY)
-    include("${CMAKE_CURRENT_LIST_DIR}/AlphaIOSInlineDependencies.cmake")
+    include("${CMAKE_CURRENT_LIST_DIR}/AlphaInlineDependencies.cmake")
     include("${CMAKE_CURRENT_LIST_DIR}/AlphaWindowsAddresses.cmake")
     # Keep the fetched unversioned header intact. Windows request IDs changed
     # when native APIs were inserted into the shared HTTP dispatch enum.
