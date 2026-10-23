@@ -9,9 +9,9 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 2 Windows address placeholders are in
-GeometryDash.bro; the engine declarations have no remaining Windows address
-placeholders. This count does not establish completeness of class layouts or
+respective modules. The overlaid game and engine declarations have no remaining
+Windows native-address placeholders. The older AppDelegate audio APIs use SDK
+compatibility helpers. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
 MoreOptionsLayer, have no usable Windows implementation in the current game.
 Release installers also require the verified-port state in
@@ -21,6 +21,16 @@ remain incomplete. This also prevents automatic CI publishing at that stage.
 `Test-AlphaReleaseGate.ps1` compiles three empty guard fixtures to check missing
 bindings, incomplete port and verified port states. It does not build an
 installer or establish release readiness.
+
+AppDelegate::musicTest and resumeSound preserve the older SDK pause/resume
+policy through current typed game state and FMOD channels. They are SDK helpers,
+not hookable native functions or a Geode 5 DLL compatibility layer. Fixtures
+cover loading, missing scenes/players, scene tag 6, pause, completion, death,
+unstarted gameplay and the menu-music preference with isolated silent channels.
+Current native gameplay checks independently confirm completion at 0x3bd5,
+started at 0x3358, player 1 at 0xdb8 and player death at 0x9c8. The completion
+flag is set by the native end/retry layer and cleared by native level reset;
+the separate flag at 0x3955 is not the completion field used by this policy.
 
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
@@ -272,7 +282,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-170 checks cover native constructors, level/list cache fixtures, fresh/expired
+172 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore

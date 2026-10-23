@@ -84,6 +84,7 @@
 #include <Geode/binding/PulseEffectAction.hpp>
 #include <Geode/binding/PagedListPopup.hpp>
 #include <Geode/binding/PlayLayer.hpp>
+#include <Geode/binding/PlayerObject.hpp>
 #include <Geode/binding/ProfilePage.hpp>
 #include <Geode/binding/ReportQueuePopup.hpp>
 #include <Geode/binding/SFXBrowser.hpp>
@@ -2167,6 +2168,116 @@ $on_game(Loaded) {
 
     runBindingTest("Native ground async completion", [] { return checkAsyncGroundCompletion(false); });
     runBindingTest("Native middleground async completion", [] { return checkAsyncGroundCompletion(true); });
+
+    runBindingTest("SDK legacy music pause policy", [] {
+        auto app = AppDelegate::get();
+        app->musicTest();
+        // Current native gameplay checks use these offsets, independently of
+        // the legacy policy implemented by the SDK compatibility helper.
+        if (sizeof(PlayLayer) != 0x3ce0 ||
+            offsetof(PlayLayer, m_hasCompletedLevel) != 0x3bd5 ||
+            offsetof(PlayLayer, m_started) != 0x3358 ||
+            offsetof(PlayLayer, m_player1) != 0xdb8 ||
+            offsetof(PlayerObject, m_isDead) != 0x9c8) return false;
+        auto manager = GameManager::get();
+        AlphaTestField loading(manager->m_loadingLevel, false);
+        AlphaTestField playState(manager->m_playLayer, static_cast<PlayLayer*>(nullptr));
+        AlphaTestField gameState(manager->m_gameLayer, manager->m_gameLayer);
+        auto play = std::make_unique<PlayLayer>();
+        manager->m_playLayer = nullptr;
+        return withNativeEditor(true, [&](LevelEditorLayer* editor) {
+            if (!editor->m_player1) return false;
+            AlphaTestField current(manager->m_playLayer, play.get());
+            AlphaTestField player(play->m_player1, editor->m_player1);
+            AlphaTestField started(play->m_started, true);
+            AlphaTestField completed(play->m_hasCompletedLevel, false);
+            AlphaTestField dead(editor->m_player1->m_isDead, false);
+            AlphaTestField paused(app->m_gamePaused, false);
+            auto scene = CCScene::create();
+            AlphaTestField running(CCDirector::get()->m_pRunningScene, scene);
+            scene->setTag(0);
+            if (app->musicTest()) return false;
+            manager->m_loadingLevel = true;
+            if (!app->musicTest()) return false;
+            manager->m_loadingLevel = false;
+            scene->setTag(6);
+            if (!app->musicTest()) return false;
+            scene->setTag(0);
+            for (bool* condition : {&app->m_gamePaused, &play->m_hasCompletedLevel, &editor->m_player1->m_isDead}) {
+                *condition = true;
+                auto muted = app->musicTest();
+                *condition = false;
+                if (!muted || app->musicTest()) return false;
+            }
+            play->m_started = false;
+            if (!app->musicTest()) return false;
+            play->m_started = true;
+            play->m_player1 = nullptr;
+            if (!app->musicTest()) return false;
+            play->m_player1 = editor->m_player1;
+            CCDirector::get()->m_pRunningScene = nullptr;
+            if (app->musicTest()) return false;
+            manager->m_loadingLevel = true;
+            auto loadingWithoutScene = app->musicTest();
+            manager->m_loadingLevel = false;
+            CCDirector::get()->m_pRunningScene = scene;
+            manager->m_playLayer = nullptr;
+            app->m_gamePaused = true;
+            return loadingWithoutScene && !app->musicTest();
+        });
+    });
+
+    runBindingTest("SDK legacy sound resume behavior", [] {
+        auto engine = FMODAudioEngine::sharedEngine();
+        auto release = [](FMOD::ChannelGroup* group) { group->release(); };
+        FMOD::ChannelGroup* global = nullptr;
+        if (engine->m_system->createChannelGroup("Alpha resume global", &global) != FMOD_OK || !global) return false;
+        std::unique_ptr<FMOD::ChannelGroup, decltype(release)> globalScope(global, release);
+        FMOD::ChannelGroup* music = nullptr;
+        if (engine->m_system->createChannelGroup("Alpha resume music", &music) != FMOD_OK || !music) return false;
+        std::unique_ptr<FMOD::ChannelGroup, decltype(release)> musicScope(music, release);
+        if (global->addGroup(music) != FMOD_OK) return false;
+        AlphaTestField globalState(engine->m_globalChannel, global);
+        AlphaTestField musicState(engine->m_backgroundMusicChannel, music);
+        return withNativeMusicChannels([&](FMODAudioEngine* audio, FMOD::Channel* first, FMOD::Channel* second) {
+            auto app = AppDelegate::get();
+            auto manager = GameManager::get();
+            AlphaTestField variables(manager->m_valueKeeper, CCDictionary::create());
+            AlphaTestField loading(manager->m_loadingLevel, false);
+            AlphaTestField play(manager->m_playLayer, static_cast<PlayLayer*>(nullptr));
+            AlphaTestField paused(app->m_gamePaused, false);
+            auto scene = CCScene::create();
+            scene->setTag(0);
+            AlphaTestField running(CCDirector::get()->m_pRunningScene, scene);
+            auto check = [&](bool channelsPaused, bool groupPaused) {
+                bool firstPaused = !channelsPaused;
+                bool secondPaused = !channelsPaused;
+                bool globalPaused = !groupPaused;
+                return first->getPaused(&firstPaused) == FMOD_OK && firstPaused == channelsPaused &&
+                    second->getPaused(&secondPaused) == FMOD_OK && secondPaused == channelsPaused &&
+                    global->getPaused(&globalPaused) == FMOD_OK && globalPaused == groupPaused;
+            };
+            manager->setGameVariable("0122", true);
+            if (global->setPaused(true) != FMOD_OK) return false;
+            app->resumeSound();
+            if (!check(true, false)) return false;
+            manager->setGameVariable("0122", false);
+            app->resumeSound();
+            if (!check(false, false)) return false;
+            manager->m_loadingLevel = true;
+            app->checkSound();
+            if (!check(true, false) || global->setPaused(true) != FMOD_OK) return false;
+            app->resumeSound();
+            if (!check(true, true)) return false;
+            manager->m_loadingLevel = false;
+            scene->setTag(6);
+            app->resumeSound();
+            if (!check(true, true)) return false;
+            scene->setTag(0);
+            app->resumeSound();
+            return check(false, false);
+        });
+    });
 
     runBindingTest("Native audio mixer restart", [] {
         auto engine = FMODAudioEngine::sharedEngine();

@@ -44,6 +44,13 @@ function(alpha_patch_address file class signature address)
         "${signature} = win ${expected}" "${signature} = win ${address}")
 endfunction()
 
+# Windows now resumes suspended audio in the engine. Preserve the older SDK
+# helpers using the verified legacy policy and the current typed game state.
+alpha_patch_address(GeometryDash AppDelegate "bool musicTest()" inline)
+alpha_patch_address(GeometryDash AppDelegate "void resumeSound()" inline)
+file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/AppDelegate.cpp" alpha_app_audio_helpers)
+file(APPEND "${alpha_bindings_output}/inline/AppDelegate.cpp" "\n${alpha_app_audio_helpers}")
+
 # Native object setup and sprite creation call these shared implementations.
 # Editor selection uses object ID, group and effective color-channel filters.
 alpha_patch_address(GeometryDash GameObject "void commonSetup()" 0x28ae70)

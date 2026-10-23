@@ -152,6 +152,8 @@ $expected = @(
     'Native ground async completion',
     'Native middleground async completion',
     'Native treasure room music fade',
+    'SDK legacy music pause policy',
+    'SDK legacy sound resume behavior',
     'Native time speed controls and audio toggle',
     'Native pause construction boundary and ownership',
     'Native pause queued start position lookup',
