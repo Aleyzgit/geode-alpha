@@ -48,7 +48,7 @@ A guarded fixture tests these defaults and actual raw/snapped/rounded values.
 The native options popup's list type is also checked against BoomListType.
 
 A separate read-only pass extracted sized-delete arguments from native primary
-RTTI tables for 537 classes. It found 89 confirmed SDK size differences; 11
+RTTI tables for 537 classes. It found 88 confirmed SDK size differences; 11
 classes could not be evaluated by that method. Four published size references
 disagree with both the current SDK and native deleting destructors: BoomListView
 is 0x1d0 (0x3f680), CCBlockLayer 0x228 (0x460b0), CCScrollLayerExt 0x208
@@ -74,6 +74,14 @@ unverified header meanings. Factories, default construction and reinitialization
 preserve ownership; guarded fixtures also pass initialized SDK storage to native
 deleting destructors 0x480ca0/0x480d50/0x480d00 with deletion flags zero. They
 verify array release counts, heap-string cleanup and allocation boundaries.
+
+GJComment reserves 0x1e0 bytes. New integers at 0x1cc/0x1d4 and a flag at 0x1d0
+precede its retained user score at 0x1d8. The native dictionary factory stores
+server key 15 at 0x1d4 and sets 0x1cc to 3 when key 14 is 6. The SDK retains
+unidentified state without inventing protocol meanings and initializes its
+friend flag as well. Fixtures exercise these actual native parser branches,
+SDK creation, three heap strings and score ownership through SDK destruction
+and the native deleting destructor at 0x218e70 with flags zero.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
 particle draw-cost field puts the base size at 0x318; the additional tail
@@ -319,7 +327,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-177 checks cover native constructors, level/list cache fixtures, fresh/expired
+179 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore

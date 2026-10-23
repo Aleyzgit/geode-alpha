@@ -103,7 +103,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. The 177 runtime checks passed in both
+Windows validation used Clang 21.1.8. The 179 runtime checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -239,6 +239,9 @@ metadata through actual native SFX search.
 Music/SFX changelog records reserve their native 0x50 bytes and own their entry
 arrays. Music changelog lines reserve 0x60 bytes for two integers and a string.
 SDK factories and reinitialization are checked alongside native destruction.
+Comments reserve their native 0x1e0 bytes, including the added scalar state
+before their retained user-score pointer. Fixtures verify native dictionary
+parsing, SDK creation and score/string cleanup through both destructor paths.
 The SDK AppDelegate audio helpers preserve the legacy pause/resume policy.
 Fixtures cover loading, scene tags, pause, completion, death, missing players
 and menu-music preferences using isolated silent FMOD channels. Native gameplay

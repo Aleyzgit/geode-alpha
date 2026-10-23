@@ -38,6 +38,7 @@
 #include <Geode/binding/GJEffectManager.hpp>
 #include <Geode/binding/GJChallengeItem.hpp>
 #include <Geode/binding/GJCommentListLayer.hpp>
+#include <Geode/binding/GJComment.hpp>
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/binding/GJKeybindManager.hpp>
 #include <Geode/binding/GlobalKeybindSource.hpp>
@@ -3104,6 +3105,56 @@ $on_game(Loaded) {
         control->~TimeSpeedControl();
         return valid && std::all_of(storage.begin() + sizeof(TimeSpeedControl), storage.end(),
             [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("SDK comment lifetime and native score ownership", [] {
+        if (sizeof(GJComment) != 0x1e0 || offsetof(GJComment, m_unk1cc) != 0x1cc ||
+            offsetof(GJComment, m_unk1d0) != 0x1d0 || offsetof(GJComment, m_key15) != 0x1d4 ||
+            offsetof(GJComment, m_userScore) != 0x1d8) return false;
+        auto score = GJUserScore::create(CCDictionary::create());
+        if (!score) return false;
+        auto before = score->retainCount();
+        auto check = [&](bool native) {
+            alignas(GJComment) std::array<uint8_t, sizeof(GJComment) + 32> storage;
+            storage.fill(0xa5);
+            auto comment = new (storage.data()) GJComment();
+            bool valid = !comment->m_isFriend && !comment->m_unk1cc && !comment->m_unk1d0 &&
+                !comment->m_key15 && !comment->m_userScore;
+            comment->m_commentString.assign(128, 'a');
+            comment->m_userName.assign(128, 'b');
+            comment->m_uploadDate.assign(128, 'c');
+            score->retain();
+            comment->m_userScore = score;
+            if (native) {
+                using FunctionType = void(*)(GJComment*, unsigned int);
+                reinterpret_cast<FunctionType>(geode::base::get() + 0x218e70)(comment, 0);
+            }
+            else {
+                comment->~GJComment();
+            }
+            return valid && score->retainCount() == before &&
+                std::all_of(storage.begin() + sizeof(GJComment), storage.end(),
+                    [](uint8_t byte) { return byte == 0xa5; });
+        };
+        return check(false) && check(true);
+    });
+
+    runBindingTest("Native comment dictionary fields and SDK factory", [] {
+        if (sizeof(GJComment) != 0x1e0) return false;
+        auto dictionary = CCDictionary::create();
+        dictionary->setObject(CCString::create("QWxwaGE="), "2");
+        dictionary->setObject(CCString::create("6"), "14");
+        dictionary->setObject(CCString::create("193"), "15");
+        auto native = GJComment::create(dictionary);
+        if (!native || native->m_commentString != "Alpha" || native->m_unk1cc != 3 ||
+            native->m_unk1d0 || native->m_key15 != 193 || native->m_userScore) return false;
+        dictionary->setObject(CCString::create("0"), "14");
+        dictionary->setObject(CCString::create("197"), "15");
+        auto other = GJComment::create(dictionary);
+        if (!other || other->m_unk1cc || other->m_key15 != 197 || other->m_userScore) return false;
+        auto sdk = GJComment::create();
+        return sdk && sdk->m_commentString.empty() && sdk->m_uploadDate.empty() &&
+            !sdk->m_isFriend && !sdk->m_unk1cc && !sdk->m_unk1d0 && !sdk->m_key15 && !sdk->m_userScore;
     });
 
     runBindingTest("SDK audio changelog records and reinitialization", [] {

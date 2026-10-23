@@ -47,6 +47,22 @@ function(alpha_patch_address file class signature address)
         "${signature} = win ${expected}" "${signature} = win ${address}")
 endfunction()
 
+# Native comments reserve 0x1e0 bytes. New scalar state precedes the retained
+# score at 0x1d8; the dictionary parser stores server key 15 at 0x1d4.
+alpha_patch_class(GeometryDash GJComment "    GJUserScore* m_userScore;"
+    "    int m_unk1cc;\n    bool m_unk1d0;\n    int m_key15;\n    GJUserScore* m_userScore;")
+set(alpha_comment_inline "${alpha_bindings_output}/inline/GJComment.cpp")
+file(READ "${alpha_comment_inline}" alpha_comment_source)
+set(alpha_comment_before "    m_canDelete = false;")
+string(FIND "${alpha_comment_source}" "${alpha_comment_before}" alpha_comment_match)
+if (alpha_comment_match LESS 0)
+    message(FATAL_ERROR "Unexpected GJComment constructor implementation")
+endif()
+string(REPLACE "${alpha_comment_before}"
+    "${alpha_comment_before}\n    m_isFriend = false;\n    m_unk1cc = 0;\n    m_unk1d0 = false;\n    m_key15 = 0;"
+    alpha_comment_source "${alpha_comment_source}")
+file(WRITE "${alpha_comment_inline}" "${alpha_comment_source}")
+
 # Native registration adds a password-strength label at 0x2e0. Its loading
 # circle and input lock follow at 0x300/0x308, within a 0x310-byte allocation.
 alpha_patch_class(GeometryDash AccountRegisterLayer
