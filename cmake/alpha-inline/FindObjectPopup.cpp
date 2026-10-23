@@ -16,14 +16,18 @@ FindObjectPopup* FindObjectPopup::create(EditorUI* ui) {
 
 bool FindObjectPopup::init(EditorUI* ui) {
     // EditorUI's native window factory inlines these settings before initWindow.
-    // They occupy the verified 0x480-byte EditorWindowPopup base storage.
+    // The current upstream names cover the verified base storage.
     static_assert(sizeof(EditorWindowPopup) == 0x480);
-    auto window = reinterpret_cast<unsigned char*>(this);
-    window[0x429] = 1;
-    window[0x42a] = 1;
-    *reinterpret_cast<int*>(window + 0x44c) = 2;
-    *reinterpret_cast<float*>(window + 0x468) = 0.6f;
-    *reinterpret_cast<float*>(window + 0x46c) = 1.f;
+    static_assert(offsetof(EditorWindowPopup, m_allowDraggingAnywhere) == 0x429);
+    static_assert(offsetof(EditorWindowPopup, m_startCentered) == 0x42a);
+    static_assert(offsetof(EditorWindowPopup, m_resizeMode) == 0x44c);
+    static_assert(offsetof(EditorWindowPopup, m_minScale) == 0x468);
+    static_assert(offsetof(EditorWindowPopup, m_maxScale) == 0x46c);
+    m_allowDraggingAnywhere = true;
+    m_startCentered = true;
+    m_resizeMode = 2;
+    m_minScale = 0.6f;
+    m_maxScale = 1.f;
     return initWindow(ui, 200.f, 89.f, 3, 0);
 }
 

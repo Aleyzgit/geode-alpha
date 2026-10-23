@@ -85,7 +85,7 @@ convert old DLLs. Some mods need to be rebuilt or ported by their authors.
 Platform checks and package hash checks remain enabled.
 
 Build with Clang and the normal upstream CMake workflow. Bindings are pinned
-to `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`; the fork's verified native
+to `2853bd1fc276870bdfcb3846ff467291e85ad6ec`; the fork's verified native
 address corrections are applied in the build directory. To reject a build
 while Windows placeholders remain, configure with
 `-DGEODE_ALPHA_REQUIRE_COMPLETE_BINDINGS=ON`. This address check now passes
@@ -103,7 +103,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. The 172 runtime checks passed in both
+Windows validation used Clang 21.1.8. The 173 runtime checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -147,8 +147,8 @@ level browsers reserve their full native
 allocations; fixtures cover construction/destruction boundaries and actual
 game-settings tab dispatch. This audit covers known mapped virtual methods,
 not every SDK interface or mod.
-An expanded structural audit covers 2,302 virtual entries across 467 classes,
-including 2,120 mapped native targets, with no remaining disagreements in that
+An expanded structural audit covers 2,303 virtual entries across 467 classes,
+including 2,121 mapped native targets, with no remaining disagreements in that
 sample. It found a missing Windows monitor handle in CCApplication; restoring
 the field fixes application setting offsets and AppDelegate's scene-delegate
 base. Live tests compare the settings with exported engine getters. Four native
@@ -212,6 +212,9 @@ check array ownership; fixtures exercise queued start positions and all three
 quest slots. The SDK quest badge follows the game's inlined setup behavior.
 The time control also reserves its native 0x160 bytes. Tests exercise its actual
 slider and audio toggle, speed rounding, label updates and SDK initialization.
+Slider thumbs initialize all snapping fields. The SDK value helper uses the
+same snapped/rounded native value as game callbacks, with tests for raw values,
+snap targets, step rounding and endpoint limits.
 Ground and middleground texture completion callbacks handle either arrival
 order. The treasure-room music fade is restored and checked against real FMOD
 fade points on isolated silent channels.
@@ -234,7 +237,7 @@ The SDK AppDelegate audio helpers preserve the legacy pause/resume policy.
 Fixtures cover loading, scene tags, pause, completion, death, missing players
 and menu-music preferences using isolated silent FMOD channels. Native gameplay
 checks independently confirm the player, start, completion and death offsets.
-All 5,513 populated generated wrappers point into executable
+All 5,899 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its

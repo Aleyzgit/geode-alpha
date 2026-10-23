@@ -21,13 +21,16 @@ function(alpha_patch_class file class before after)
         message(FATAL_ERROR "Unterminated binding class ${class}")
     endif()
     string(SUBSTRING "${tail}" 0 ${end} block)
-    string(FIND "${block}" "${before}" match)
-    if (match LESS 0)
-        # An upstream update may already contain this exact verified fix.
+    # Prefer an existing complete correction over its shorter source prefix.
+    # Empty replacements remove declarations and cannot identify a fix.
+    if (NOT "${after}" STREQUAL "")
         string(FIND "${block}" "${after}" already_patched)
         if (NOT already_patched LESS 0)
             return()
         endif()
+    endif()
+    string(FIND "${block}" "${before}" match)
+    if (match LESS 0)
         message(FATAL_ERROR "Unexpected binding in ${class}: ${before}")
     endif()
     string(REPLACE "${before}" "${after}" patched "${block}")
@@ -62,9 +65,24 @@ alpha_patch_address(GeometryDash EditorUI
     "bool canSelectObject(GameObject* object)" 0x1c8500)
 alpha_patch_address(GeometryDash EditorUI "void updateZoom(float zoom)" 0x1b4c00)
 alpha_patch_class(GeometryDash EditorUI
-    "    TodoReturn updateZoom(float, cocos2d::CCPoint);"
-    "    void updateZoom(float zoom, cocos2d::CCPoint anchor) = win 0x1b4c70;")
+    "    void updateZoom(float, cocos2d::CCPoint) = win 0x1b4c70, m1 0x10464, imac 0x120c0;"
+    "    void updateZoom(float zoom, cocos2d::CCPoint anchor) = win 0x1b4c70, m1 0x10464, imac 0x120c0;")
 alpha_patch_address(GeometryDash LevelEditorLayer "void updateGridLayerParent()" 0x3ef7a0)
+
+# Native slider callbacks read the snapped helper, not the raw-position helper.
+# SDK thumb construction must initialize the new snapping controls as well.
+alpha_patch_address(GeometryDash SliderThumb "float getValue()" 0x84020 0x83f90)
+set(alpha_slider_thumb_inline "${alpha_bindings_output}/inline/SliderThumb.cpp")
+file(READ "${alpha_slider_thumb_inline}" alpha_slider_thumb_source)
+set(alpha_slider_thumb_before "    m_vertical = false;")
+string(FIND "${alpha_slider_thumb_source}" "${alpha_slider_thumb_before}" alpha_slider_thumb_match)
+if (alpha_slider_thumb_match LESS 0)
+    message(FATAL_ERROR "Unexpected SliderThumb constructor implementation")
+endif()
+string(REPLACE "${alpha_slider_thumb_before}"
+    "${alpha_slider_thumb_before}\n    m_snapValue = -1.f;\n    m_snapThreshold = 0.f;\n    m_snapStep = 0.f;"
+    alpha_slider_thumb_source "${alpha_slider_thumb_source}")
+file(WRITE "${alpha_slider_thumb_inline}" "${alpha_slider_thumb_source}")
 
 # Native MusicBrowser construction reserves 0x398. Search controls, branding
 # and view buttons were added between the older SDK's existing fields.
@@ -253,7 +271,8 @@ alpha_patch_address(GeometryDash ProfilePage
 
 # Gameplay's pause factory allocates 0x2a0 and initializes these fields after
 # the delegate bases. Its destructor retains ownership of the startpos array.
-alpha_patch_class(GeometryDash PauseLayer "    bool m_tryingQuit;"
+alpha_patch_class(GeometryDash PauseLayer
+    "    bool m_tryingQuit;\n    bool m_uiHidden;\n    cocos2d::CCLabelBMFont* m_startposLabel;\n    int m_startPosIndex;\n    cocos2d::CCArray* m_startPositions;\n    bool m_isEditorLevel;\n    TimeSpeedControl* m_timeSpeedControls;\n    cocos2d::CCLayer* m_layer;\n    Slider* m_musicSlider;\n    Slider* m_sfxSlider;\n    cocos2d::CCMenu* m_showUIMenu;\n    CCMenuItemSpriteExtra* m_platformSettingsButton;"
     "    bool m_tryingQuit;\n    bool m_uiHidden;\n    cocos2d::CCLabelBMFont* m_startPosLabel;\n    int m_startPosIndex;\n    cocos2d::CCArray* m_startPosObjects;\n    bool m_startPosChanged;\n    TimeSpeedControl* m_timeSpeedControl;\n    cocos2d::CCLayer* m_mainLayer;\n    Slider* m_musicSlider;\n    Slider* m_sfxSlider;\n    cocos2d::CCMenu* m_hideMenu;\n    cocos2d::CCSprite* m_questsSprite;")
 alpha_patch_class(GeometryDash PauseLayer "TodoReturn checkQuestsStatus()" "void checkQuestsStatus()")
 alpha_patch_address(GeometryDash PauseLayer "void checkQuestsStatus()" inline)
@@ -274,9 +293,9 @@ file(WRITE "${alpha_pause_inline}" "${alpha_pause_content}\n${alpha_pause_constr
 # after CCNode. Native slider callbacks update gameplay and audio speed floats.
 alpha_patch_class(GeometryDash TimeSpeedControl "    virtual ~TimeSpeedControl()"
     "    TimeSpeedControl() = win inline;\n    virtual ~TimeSpeedControl()")
-alpha_patch_class(GeometryDash TimeSpeedControl "    static TimeSpeedControl* create(GJBaseGameLayer*);"
+alpha_patch_class(GeometryDash TimeSpeedControl "    static TimeSpeedControl* create(GJBaseGameLayer*) = win 0x66d6e0;"
     "    static TimeSpeedControl* create(GJBaseGameLayer* layer) = win 0x66d6e0;")
-alpha_patch_class(GeometryDash TimeSpeedControl "    bool init(GJBaseGameLayer*);"
+alpha_patch_class(GeometryDash TimeSpeedControl "    bool init(GJBaseGameLayer*) = win 0x66d790;"
     "    bool init(GJBaseGameLayer* layer) = win 0x66d790;")
 alpha_patch_class(GeometryDash TimeSpeedControl "    void onAudioTimeSpeedToggle(cocos2d::CCObject* sender);"
     "    void onAudioTimeSpeedToggle(cocos2d::CCObject* sender) = win 0x66ddd0;")
@@ -303,7 +322,7 @@ std::unordered_set<int> LevelTools::getLevelList() {
 # The native timeline helper has seven arguments. Retain the SDK's older
 # eight-argument overload as a forwarding helper, excluding its unused tail.
 set(alpha_timeline_signature "static cocos2d::CCPoint posForTimeInternal(float time, cocos2d::CCArray* objects, int speed, bool platformer, bool ignoreMinorAxis, bool ignoreWarp, int& rotateChannel, int unused)")
-alpha_patch_address(GeometryDash LevelTools "${alpha_timeline_signature}" inline)
+alpha_patch_address(GeometryDash LevelTools "${alpha_timeline_signature}" inline 0x4676d0)
 alpha_patch_class(GeometryDash LevelTools "    ${alpha_timeline_signature}"
     "    static cocos2d::CCPoint posForTimeInternal(float time, cocos2d::CCArray* objects, int speed, bool platformer, bool ignoreMinorAxis, bool ignoreWarp, int& rotateChannel) = win 0x4676d0;\n    ${alpha_timeline_signature}")
 file(APPEND "${alpha_bindings_output}/inline/LevelTools.cpp" [=[
@@ -331,7 +350,7 @@ endforeach()
 # Shader split targets are doubles: native tween actions 45/46 write 0x2b0
 # and 0x2b8. The flags follow at 0x2c0; construction reserves 0x2d0.
 alpha_patch_class(GeometryDash GJShaderState
-    "GJShaderState() = win 0x9999999" "GJShaderState() = win inline")
+    "GJShaderState() = win 0x5206b0" "GJShaderState() = win inline")
 alpha_patch_class(GeometryDash GJShaderState
     "    float m_splitTargetRows;\n    float m_splitTargetCols;"
     "    double m_splitTargetRows;\n    double m_splitTargetCols;")
@@ -625,11 +644,7 @@ endif()
 # new state precedes the social links and request flags. Preserve that state
 # without guessing the names of fields not yet identified.
 if (WIN32)
-    alpha_patch_class(GeometryDash GJUserScore
-        "    std::string m_youtubeURL;"
-        "    PAD = win 0xc;\n    std::string m_youtubeURL;")
-    alpha_patch_class(GeometryDash GJUserScore
-        "    bool m_newFriendRequest;" "    PAD = win 0x14;\n    bool m_newFriendRequest;")
+    # Upstream now names the social/request fields previously reserved here.
     # 0x218bc0 is a deleting destructor with an extra flags parameter. Its
     # body only destroys the declared strings and the CCNode base.
     alpha_patch_class(GeometryDash GJUserScore
@@ -737,7 +752,7 @@ alpha_patch_address(GeometryDash FMODAudioEngine
 # eight-argument declaration had no Windows implementation; its tail is unused.
 set(alpha_start_music_signature "void startMusic(int start, int end, int fadeIn, int fadeOut, bool loop, int musicID, bool noResume, bool dontReset)")
 alpha_patch_class(GeometryDash FMODAudioEngine
-    "${alpha_start_music_signature} = imac"
+    "${alpha_start_music_signature} = win 0x63270, imac"
     "${alpha_start_music_signature} = win inline, imac")
 alpha_patch_class(GeometryDash FMODAudioEngine "    ${alpha_start_music_signature}"
     "    void startMusic(int start, int end, int fadeIn, int fadeOut, bool loop, int musicID, bool noResume) = win 0x63270;\n    ${alpha_start_music_signature}")
@@ -749,11 +764,8 @@ void FMODAudioEngine::startMusic(int start, int end, int fadeIn, int fadeOut, bo
 #endif
 ]=])
 alpha_patch_class(GeometryDash FMODAudioEngine
-    "    FMOD_RESULT m_lastResult;"
-    "    PAD = win 0x8;\n    FMOD_RESULT m_lastResult;")
-alpha_patch_class(GeometryDash FMODAudioEngine
-    "    FMODAudioState m_audioState;"
-    "    win {\n    bool m_suspendedGlobalAudio;\n    std::vector<int> m_suspendedChannels;\n    }\n    FMODAudioState m_audioState;")
+    "    bool m_globalChannelPaused;\n    std::vector<int> m_stoppedChannelIDs;"
+    "    bool m_suspendedGlobalAudio;\n    std::vector<int> m_suspendedChannels;")
 # Native channel tables at 0x668 and 0x730; stop paths use those tables and
 # the channel groups at 0x808/0x848. Queries are tested with isolated maps.
 alpha_patch_address(GeometryDash FMODAudioEngine
@@ -769,7 +781,7 @@ alpha_patch_address(GeometryDash FMODAudioEngine
 # Native 0x5bdc0 initializes the same containers and zeros the first two floats;
 # calling it from the body would construct containers twice and leak storage.
 alpha_patch_class(GeometryDash FMODAudioState
-    "    FMODAudioState() = win 0x9999999, inline;"
+    "    FMODAudioState() = win 0x5bdc0, inline;"
     "    FMODAudioState() = inline;")
 set(alpha_audio_inline "${alpha_bindings_output}/inline/FMODAudioState.cpp")
 file(READ "${alpha_audio_inline}" alpha_audio_content)
@@ -786,7 +798,7 @@ file(CONFIGURE OUTPUT "${alpha_audio_inline}" CONTENT "${alpha_audio_content}" @
 # The two-argument thunk supplies the level's daily ID to the shared native
 # three-argument formatter; calling 0x264630 directly leaves that ID undefined.
 alpha_patch_address(GeometryDash GJGameLevel
-    "char const* getCoinKey(int coinNumber)" 0x264610)
+    "char const* getCoinKey(int coinNumber)" 0x264610 0x264630)
 # Pulse strength/type/color fields at 0x18/0x20/0x1c; group colors are guarded
 # by the native bit vector and use the pulse-action map. Checked with fixtures.
 alpha_patch_address(GeometryDash GJEffectManager
@@ -798,8 +810,8 @@ alpha_patch_address(GeometryDash GJEffectManager
 # (result, ID). Both switch over object IDs and construct the output CCPoint.
 # Preserve correct native parameter placement by declaring the current API static.
 alpha_patch_class(GeometryDash EditorUI
-    "    cocos2d::CCPoint offsetForKey(int id) = win 0x9999999;"
-    "    static cocos2d::CCPoint offsetForKey(int id) = win 0x19f3e0;")
+    "    cocos2d::CCPoint offsetForKey(int id) = win 0x19f3e0, m1 0x548e7, imac 0x603db0;"
+    "    static cocos2d::CCPoint offsetForKey(int id) = win 0x19f3e0, m1 0x548e7, imac 0x603db0;")
 # Native factory installs BoomScrollLayer's RTTI tables and calls init 0x40b60.
 # The dots updater uses its 0x1a0 array and page state, matching its eight callers.
 alpha_patch_address(GeometryDash BoomScrollLayer
@@ -860,8 +872,7 @@ alpha_patch_address(GeometryDash GameStatsManager
 # destructor allocates/frees 0x470, including the new trailing 0x40-byte map.
 alpha_patch_address(GeometryDash GJOptionsLayer
     "GJOptionsLayer()" 0x1800b0)
-alpha_patch_class(GeometryDash GJOptionsLayer
-    "    float m_offset;" "    float m_offset;\n    PAD = win 0x40;")
+# Upstream now declares the trailing toggle-button map on Windows.
 # The native base didToggleGV implementation (0x98e10) only destroys its string
 # argument. An empty C++ body performs that same argument cleanup automatically.
 alpha_patch_class(GeometryDash GJOptionsLayer
@@ -1003,9 +1014,7 @@ alpha_patch_class(GeometryDash EditorWindowPopup
 alpha_patch_class(GeometryDash EditorWindowPopup
     "    virtual void onBuildWindowContent() = win 0x9999999;"
     "    inline virtual void onBuildWindowContent() = 0;")
-alpha_patch_class(GeometryDash EditorWindowPopup
-    "    TodoReturn touchRect();"
-    "    TodoReturn touchRect();\n    PAD = win 0x98;")
+# Upstream now declares the native window fields instead of reserved storage.
 
 # EditorUI inlines the find window's initialization. Its final member is a
 # 32-bit group ID, updated by valueDidChange at 0x1809e0, not a boolean.
@@ -1056,11 +1065,7 @@ alpha_patch_class(GeometryDash SetTextPopup
 alpha_patch_class(GeometryDash SetTextPopup
     "    ~SetTextPopup() = win 0x399820;"
     "    ~SetTextPopup() = win inline;")
-alpha_patch_class(GeometryDash SetTextPopup
-    "    std::string m_value;" "    PAD = win 0x8;\n    std::string m_value;")
-alpha_patch_class(GeometryDash SetTextPopup
-    "    SetTextPopupDelegate* m_delegate;"
-    "    PAD = win 0x18;\n    SetTextPopupDelegate* m_delegate;")
+# Upstream now names the extra scalar and emote fields before the delegate.
 alpha_patch_class(GeometryDash SetTextPopup
     "static SetTextPopup* create(std::string, std::string, int, std::string, std::string, bool, float, bool, int, int) = imac"
     "static SetTextPopup* create(std::string, std::string, int, std::string, std::string, bool, float, bool, int, int) = win 0x3a6f70, imac")
@@ -1082,17 +1087,13 @@ alpha_patch_class(GeometryDash MusicDownloadManager
     "    cocos2d::CCDictionary* m_sfxObjects;"
     "    PAD = win 0x8;\n    cocos2d::CCDictionary* m_sfxObjects;")
 alpha_patch_class(GeometryDash MusicDownloadManager
-    "    cocos2d::CCArray* m_sfxArtists;"
+    "    cocos2d::CCArray* m_sfxArtists;\n    cocos2d::CCObject* m_unk1a0;\n    cocos2d::CCObject* m_unk1a8;"
     "    cocos2d::CCArray* m_sfxArtists;\n    cocos2d::CCArray* m_sfxChangelog;")
+# The new upstream news tail extends past the native 0x3d0 allocation.
+# Retain verified container fields and reserve the unverified news storage.
 alpha_patch_class(GeometryDash MusicDownloadManager
-    "    std::map<int, std::string> m_musicTags;"
-    "    PAD = win 0x8;\n    std::map<int, std::string> m_musicTags;")
-alpha_patch_class(GeometryDash MusicDownloadManager
-    "    int m_musicLibraryVersion;"
-    "    PAD = win 0x10;\n    int m_musicLibraryVersion;")
-alpha_patch_class(GeometryDash MusicDownloadManager
-    "    std::unordered_set<int> m_resourceSongUnorderedSet;"
-    "    std::unordered_set<int> m_resourceSongUnorderedSet;\n    PAD = win 0x148;")
+    "    PAD = win 0x24;\n    int m_newsPages;\n    PAD = win 0x8;\n    bool m_updatingNewsFeed;\n    bool m_unkBool2;\n    bool m_requestedNewsFeedUpdate;\n    int m_unkInt5;"
+    "    PAD = win 0x30;")
 if (WIN32)
     alpha_patch_class(GeometryDash MusicDownloadManager
         "    virtual ~MusicDownloadManager()"
@@ -1112,8 +1113,8 @@ endif()
 # The current search page adds a no-stars sprite at 0x1c8. The native
 # difficulty/length arrays move to 0x1d0/0x1d8 and their dictionary to 0x1e0.
 alpha_patch_class(GeometryDash LevelSearchLayer
-    "    cocos2d::CCArray* m_difficultySprites;"
-    "    win {\n    cocos2d::CCSprite* m_noStarsSprite;\n    }\n    cocos2d::CCArray* m_difficultySprites;")
+    "    cocos2d::CCSprite* m_noStarSprite;"
+    "    cocos2d::CCSprite* m_noStarsSprite;")
 set(alpha_search_inline "${alpha_bindings_output}/inline/LevelSearchLayer.cpp")
 file(READ "${alpha_search_inline}" alpha_search_content)
 set(alpha_search_before "    m_starsSprite = nullptr;")
@@ -1182,7 +1183,7 @@ if (WIN32)
         "    NumberInputLayer() = inline;"
         "    NumberInputLayer() = win 0x4a1060, inline;")
     alpha_patch_class(GeometryDash NumberInputLayer
-        "    void onDone(cocos2d::CCObject* sender) = win 0x4a1820;"
+        "    void onDone(cocos2d::CCObject* sender);"
         "    virtual void onDone(cocos2d::CCObject* sender) = win 0x4a1b10;")
     # Use upstream's title/prefix fields and iOS-only inline implementations.
     # The native derived factory reserves one additional integer and alignment.
@@ -1210,9 +1211,7 @@ alpha_patch_address(GeometryDash GJBaseGameLayer
 if (WIN32)
     alpha_patch_class(GeometryDash GJEffectManager
         "    // GJEffectManager();" "    GJEffectManager() = win 0x362520;")
-    alpha_patch_class(GeometryDash GJEffectManager
-        "    std::unordered_set<int> m_unk3f0;"
-        "    int m_unk3f0Value;\n    PAD = win 0x4;\n    std::unordered_set<int> m_unk3f0;")
+    # Upstream now names the native integer preceding the item-state sets.
     # The old native store method only inserts this unique pair. Supply the
     # equivalent SDK implementation against the corrected current container.
     alpha_patch_class(GeometryDash GJEffectManager
@@ -1242,15 +1241,9 @@ if (WIN32)
             "virtual TodoReturn saveFinished(bool)" "virtual void saveFinished(bool)")
     endforeach()
 
-    set(alpha_hitbox_before [=[    virtual TodoReturn shouldDrawDebugHitboxes() = win 0x317660;
-    virtual TodoReturn shouldDrawHitboxTrail() = win 0x5a3a0;
-    virtual TodoReturn shouldRecordHitboxTrail() = win 0x5a3a0;
-    virtual TodoReturn getHitboxTrailMax() = win 0x317680;
-]=])
-    alpha_patch_class(GeometryDash GJBaseGameLayer "${alpha_hitbox_before}" "")
-    set(alpha_section_declaration "    virtual void addToSection(GameObject* object) = win 0x32f280, imac 0x11d090, m1 0xf7654;")
-    alpha_patch_class(GeometryDash GJBaseGameLayer "${alpha_section_declaration}"
-        "    virtual bool shouldDrawDebugHitboxes() = win 0x317660;\n    virtual bool shouldDrawHitboxTrail() = win 0x5a3a0;\n    virtual bool shouldRecordHitboxTrail() = win 0x5a3a0;\n    virtual int getHitboxTrailMax() = win 0x317680;\n${alpha_section_declaration}")
+    # Upstream now places the hitbox callbacks before addToSection.
+    alpha_patch_class(GeometryDash GJBaseGameLayer
+        "virtual TodoReturn getHitboxTrailMax()" "virtual int getHitboxTrailMax()")
     foreach(class IN ITEMS LevelEditorLayer PlayLayer)
         foreach(method IN ITEMS shouldDrawDebugHitboxes shouldDrawHitboxTrail shouldRecordHitboxTrail)
             alpha_patch_class(GeometryDash "${class}"
@@ -1338,10 +1331,8 @@ if (WIN32)
     alpha_patch_class(GeometryDash OptionsObject
         "    virtual ~OptionsObject() = win 0x399c70;"
         "    OptionsObject() = win inline;\n    virtual ~OptionsObject() = win inline;")
-    alpha_patch_class(GeometryDash OptionsObject
-        "    int m_count;" "    int m_unk68;\n    int m_count;\n    PAD = win 0x8;")
     file(APPEND "${alpha_bindings_output}/inline/OptionsObject.cpp"
-        "\n#ifdef GEODE_IS_WINDOWS\nOptionsObject::OptionsObject() : m_optionID(0), m_enabled(false), m_delegate(nullptr), m_unk68(0), m_count(0) {\n    std::memset(reinterpret_cast<unsigned char*>(this) + 0x70, 0, 8);\n}\nOptionsObject::~OptionsObject() {}\n#endif\n")
+        "\n#ifdef GEODE_IS_WINDOWS\nOptionsObject::OptionsObject() : m_optionID(0), m_enabled(false), m_delegate(nullptr), m_type(0), m_count(0), m_startPosObject(nullptr) {}\nOptionsObject::~OptionsObject() {}\n#endif\n")
 
     alpha_patch_class(GeometryDash OptionsScrollLayer
         "    virtual ~OptionsScrollLayer()"
@@ -1417,11 +1408,9 @@ endif()
 # initializes the All/Any flag at 0x8e and view-filter mode at 0x94.
 if (WIN32)
     alpha_patch_class(GeometryDash MusicSearchResult
-        "    bool m_artistFilter;"
-        "    bool m_artistFilter;\n    bool m_matchAnyTags;")
+        "    bool m_unk86;" "    bool m_matchAnyTags;")
     alpha_patch_class(GeometryDash MusicSearchResult
-        "    GJSongType m_songType;"
-        "    GJSongType m_songType;\n    int m_viewFilterMode;")
+        "    int m_viewFilter;" "    int m_viewFilterMode;")
     alpha_patch_class(GeometryDash MusicSearchResult
         "applyArtistFilters(cocos2d::CCArray* objects) = win inline"
         "applyArtistFilters(cocos2d::CCArray* objects) = win 0x4981c0")
@@ -1580,31 +1569,18 @@ endif()
 # vtable slots in this version. Do not expose unrelated function addresses.
 if (WIN32)
     foreach(obsolete IN ITEMS
-        "    virtual void FLAlert_Clicked(FLAlertLayer* layer, bool btn2) = win 0x9999999;"
-        "    virtual void uploadActionFinished(int id, int response) = win 0x9999999;"
-        "    virtual void uploadActionFailed(int id, int response) = win 0x9999999;"
-        "    virtual void onClosePopup(UploadActionPopup* popup) = win 0x9999999;"
         "    void markAsRead() = win 0x504490, imac 0x240820, m1 0x1eb810;"
         "    void onDeleteRequest(cocos2d::CCObject* sender);"
         "    void onViewFriendRequest(cocos2d::CCObject* sender) = win 0x1550d0;")
         alpha_patch_class(GeometryDash GJRequestCell "${obsolete}\n" "")
     endforeach()
     alpha_patch_class(GeometryDash GJRequestCell
-        "    UploadActionPopup* m_popup;\n    CCMenuItemToggler* m_toggler;"
-        "    CCMenuItemToggler* m_toggler;\n    bool m_requestStatusIsFour;\n    PAD = win 0x7;")
+        "    bool m_groupRequest;" "    bool m_requestStatusIsFour;")
     alpha_patch_class(GeometryDash GJRequestCell
         "void onToggle(cocos2d::CCObject* sender);"
         "void onToggle(cocos2d::CCObject* sender) = win 0x1592a0;")
     alpha_patch_class(GeometryDash GJRequestCell
         "void onViewProfile(cocos2d::CCObject* sender) = imac"
         "void onViewProfile(cocos2d::CCObject* sender) = win 0x157b80, imac")
-    set(alpha_request_inline "${alpha_bindings_output}/inline/GJRequestCell.cpp")
-    file(READ "${alpha_request_inline}" alpha_request_content)
-    set(alpha_request_before "    auto glm = GameLevelManager::sharedState();\n    // TODO: 2.209\n    // if (glm->m_uploadActionDelegate == this) glm->m_uploadActionDelegate = nullptr;\n    if (m_popup) m_popup->m_delegate = nullptr;\n")
-    string(FIND "${alpha_request_content}" "${alpha_request_before}" alpha_request_match)
-    if (alpha_request_match LESS 0)
-        message(FATAL_ERROR "Unexpected GJRequestCell destructor implementation")
-    endif()
-    string(REPLACE "${alpha_request_before}" "" alpha_request_content "${alpha_request_content}")
-    file(CONFIGURE OUTPUT "${alpha_request_inline}" CONTENT "${alpha_request_content}" @ONLY)
+    # Upstream also removed the obsolete popup ownership from the destructor.
 endif()

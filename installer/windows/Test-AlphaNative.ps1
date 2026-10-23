@@ -155,6 +155,7 @@ $expected = @(
     'SDK legacy music pause policy',
     'SDK legacy sound resume behavior',
     'Native time speed controls and audio toggle',
+    'SDK slider snapping and native value helpers',
     'Native pause construction boundary and ownership',
     'Native pause queued start position lookup',
     'Native quest availability and pause badge',

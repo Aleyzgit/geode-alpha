@@ -1,6 +1,7 @@
 #include <Geode/binding/AchievementManager.hpp>
 #include <Geode/binding/AppDelegate.hpp>
 #include <Geode/binding/BoomScrollLayer.hpp>
+#include <Geode/binding/BoomListView.hpp>
 #include <Geode/binding/ButtonSprite.hpp>
 #include <Geode/binding/BrowseSmartTemplateLayer.hpp>
 #include <Geode/binding/CCAnimateFrameCache.hpp>
@@ -34,6 +35,7 @@
 #include <Geode/binding/GameToolbox.hpp>
 #include <Geode/binding/GJEffectManager.hpp>
 #include <Geode/binding/GJChallengeItem.hpp>
+#include <Geode/binding/GJCommentListLayer.hpp>
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/binding/GJKeybindManager.hpp>
 #include <Geode/binding/GlobalKeybindSource.hpp>
@@ -3099,6 +3101,37 @@ $on_game(Loaded) {
             [](uint8_t byte) { return byte == 0xa5; });
     });
 
+    runBindingTest("SDK slider snapping and native value helpers", [] {
+        alignas(SliderThumb) std::array<uint8_t, sizeof(SliderThumb) + 32> storage;
+        storage.fill(0xa5);
+        auto sdkThumb = new (storage.data()) SliderThumb();
+        bool valid = sizeof(SliderThumb) == 0x1a8 &&
+            offsetof(SliderThumb, m_snapValue) == 0x198 &&
+            offsetof(SliderThumb, m_snapThreshold) == 0x19c &&
+            offsetof(SliderThumb, m_snapStep) == 0x1a0 &&
+            sdkThumb->m_snapValue == -1.f && sdkThumb->m_snapThreshold == 0.f && sdkThumb->m_snapStep == 0.f;
+        sdkThumb->~SliderThumb();
+        if (!valid || !std::all_of(storage.begin() + sizeof(SliderThumb), storage.end(),
+            [](uint8_t byte) { return byte == 0xa5; })) return false;
+        auto slider = Slider::create(CCNode::create(), nullptr);
+        if (!slider) return false;
+        auto thumb = slider->getThumb();
+        if (!thumb || thumb->m_snapValue != -1.f || thumb->m_snapThreshold != 0.f || thumb->m_snapStep != 0.f) {
+            return false;
+        }
+        thumb->m_snapValue = .5f;
+        thumb->m_snapThreshold = .1f;
+        slider->setValue(.53f);
+        if (std::abs(thumb->getRawValue() - .53f) > .001f || slider->getValue() != .5f) return false;
+        thumb->m_snapValue = -1.f;
+        thumb->m_snapStep = .25f;
+        for (auto [raw, snapped] : {std::pair{0.f, 0.f}, {.37f, .25f}, {.63f, .75f}, {1.f, 1.f}}) {
+            slider->setValue(raw);
+            if (std::abs(thumb->getRawValue() - raw) > .001f || slider->getValue() != snapped) return false;
+        }
+        return true;
+    });
+
     runBindingTest("Native time speed controls and audio toggle", [] {
         return withNativeEditor(true, [](LevelEditorLayer* editor) {
             if (offsetof(GJBaseGameLayer, m_unk3380) != 0x3560 ||
@@ -3592,7 +3625,7 @@ $on_game(Loaded) {
         auto destroy = [](GJEffectManager* value) { value->GJEffectManager::~GJEffectManager(); };
         std::unique_ptr<GJEffectManager, decltype(destroy)> effects(
             new (storage.data()) GJEffectManager(), destroy);
-        bool valid = effects->m_unk3f0Value == 0 && effects->m_unk3f0.empty() &&
+        bool valid = effects->m_platformerProgress == 0 && effects->m_unk3f0.empty() &&
             effects->m_unk430.empty() && effects->m_unkMap498.empty() &&
             effects->m_timerItemMap.empty() && effects->m_spawnTriggerActions.empty();
         effects->m_unk3f0.insert(17);
@@ -3629,7 +3662,8 @@ $on_game(Loaded) {
         auto options = CCArray::create();
         options->addObject(option);
         auto popup = OptionsScrollLayer::create(options, false, "Alpha options fixture", nullptr);
-        if (!popup || popup->m_optionObjects != options || !popup->m_listLayer) return false;
+        if (!popup || popup->m_optionObjects != options || !popup->m_listLayer ||
+            !popup->m_listLayer->m_list || popup->m_listLayer->m_list->m_type != BoomListType::Options) return false;
         Ref<OptionsCell> row = findOptionsRow(popup, option);
         if (!row) return false;
         row->onToggleOption(nullptr);

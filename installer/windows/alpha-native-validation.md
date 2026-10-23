@@ -34,9 +34,27 @@ the separate flag at 0x3955 is not the completion field used by this policy.
 
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
-`4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,513 populated native wrappers, all pointing into executable sections of
+`2853bd1fc276870bdfcb3846ff467291e85ad6ec`. The generated Windows build has
+5,899 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
+
+Bindings revision 2853bd1 adds named editor-window, option, score and audio
+fields. The Windows overlay removes its earlier reserved storage where these
+fields now exist and retains independently verified address/signature fixes.
+SliderThumb::getValue remains 0x84020: native time-control callbacks use its
+snapping/step policy, while 0x83f90 returns raw position. SDK construction
+initializes snap target -1, threshold 0 and step 0, matching native construction.
+A guarded fixture tests these defaults and actual raw/snapped/rounded values.
+The native options popup's list type is also checked against BoomListType.
+
+A separate read-only pass extracted sized-delete arguments from native primary
+RTTI tables for 537 classes. It found 93 confirmed SDK size differences; 11
+classes could not be evaluated by that method. Four published size references
+disagree with both the current SDK and native deleting destructors: BoomListView
+is 0x1d0 (0x3f680), CCBlockLayer 0x228 (0x460b0), CCScrollLayerExt 0x208
+(0x4ad40), and GManager 0x168 (0x5a200). These reference errors do not justify
+padding those classes. Size checks do not prove member layout or ABI behavior,
+and the remaining confirmed differences keep release readiness incomplete.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
 particle draw-cost field puts the base size at 0x318; the additional tail
@@ -282,7 +300,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-172 checks cover native constructors, level/list cache fixtures, fresh/expired
+173 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -384,9 +402,9 @@ return types. Runtime fixtures check derived editor dispatch and typed delegate
 callbacks. The audit excludes unmapped methods, overloads and classes without
 available native RTTI; it does not establish complete SDK compatibility.
 
-A broader structural audit checks 2,302 virtual entries across 467 classes,
+A broader structural audit checks 2,303 virtual entries across 467 classes,
 including unmapped methods. All have a matching native subobject offset and
-in-range slot; 2,120 also match their mapped native target. This found another
+in-range slot; 2,121 also match their mapped native target. This found another
 base-offset error: Windows CCApplication owns an HMONITOR at 0xc8, before the
 settings at 0xd0..0xd6. Including it restores the native base size of 0xd8 and
 AppDelegate's CCSceneDelegate offset of 0xd8. The running-scene pointer is at
