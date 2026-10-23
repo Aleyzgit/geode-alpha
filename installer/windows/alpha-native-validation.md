@@ -14,6 +14,13 @@ GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
 MoreOptionsLayer, have no usable Windows implementation in the current game.
+Release installers also require the verified-port state in
+`cmake/AlphaReleaseReadiness.cmake`. The actual NSIS guard rejects both missing
+addresses and a port with zero placeholders whose layout/compatibility checks
+remain incomplete. This also prevents automatic CI publishing at that stage.
+`Test-AlphaReleaseGate.ps1` compiles three empty guard fixtures to check missing
+bindings, incomplete port and verified port states. It does not build an
+installer or establish release readiness.
 
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is

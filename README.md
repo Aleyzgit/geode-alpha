@@ -91,6 +91,10 @@ while Windows placeholders remain, configure with
 until the remaining native bindings have been ported. It also checks custom
 `GEODE_BINDINGS_PATH` directories and the engine declarations. Passing this
 address check alone does not prove mod or class-layout compatibility.
+The Windows installer additionally requires verified port readiness from
+`cmake/AlphaReleaseReadiness.cmake`. It stays disabled while native layout,
+compatibility and installer/runtime preservation validation is incomplete,
+including after the last address placeholder is removed.
 
 Loader auto-updates are disabled by default. Use the resources produced by
 the same build as the loader. Run the optional runtime checks with

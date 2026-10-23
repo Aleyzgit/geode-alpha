@@ -84,9 +84,10 @@ option(GEODE_ALPHA_REQUIRE_COMPLETE_BINDINGS
     "Reject builds with unresolved Windows native addresses" OFF)
 # The Windows installer is a release artifact. Keep its completeness decision
 # tied to the same audited binding copy used by the loader build.
+include("${CMAKE_CURRENT_LIST_DIR}/AlphaReleaseReadiness.cmake")
 if (NOT CMAKE_SCRIPT_MODE_FILE)
     file(CONFIGURE OUTPUT "${CMAKE_CURRENT_LIST_DIR}/../bin/nightly/alpha-release-state.nsh"
-        CONTENT "!define ALPHA_UNRESOLVED_WINDOWS_BINDINGS @alpha_missing_count@\n" @ONLY)
+        CONTENT "!define ALPHA_UNRESOLVED_WINDOWS_BINDINGS @alpha_missing_count@\n!define ALPHA_RELEASE_READY @alpha_release_ready@\n" @ONLY)
 endif()
 if (alpha_missing_count GREATER 0)
     if (GEODE_ALPHA_REQUIRE_COMPLETE_BINDINGS)

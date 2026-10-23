@@ -3,9 +3,7 @@
     !include nsDialogs.nsh
     !include WinMessages.nsh
     !include "..\..\bin\nightly\alpha-release-state.nsh"
-    !if ${ALPHA_UNRESOLVED_WINDOWS_BINDINGS} != 0
-        !error "Geode Alpha installer is blocked: unresolved Windows native bindings remain."
-    !endif
+    !include "AlphaReleaseGuard.nsh"
 
 ; settings
     Name "Geode Alpha (Unofficial)"
