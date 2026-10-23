@@ -35,7 +35,7 @@ the separate flag at 0x3955 is not the completion field used by this policy.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `2853bd1fc276870bdfcb3846ff467291e85ad6ec`. The generated Windows build has
-5,901 populated native wrappers, all pointing into executable sections of
+5,898 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 Bindings revision 2853bd1 adds named editor-window, option, score and audio
@@ -48,7 +48,7 @@ A guarded fixture tests these defaults and actual raw/snapped/rounded values.
 The native options popup's list type is also checked against BoomListType.
 
 A separate read-only pass extracted sized-delete arguments from native primary
-RTTI tables for 537 classes. It found 92 confirmed SDK size differences; 11
+RTTI tables for 537 classes. It found 89 confirmed SDK size differences; 11
 classes could not be evaluated by that method. Four published size references
 disagree with both the current SDK and native deleting destructors: BoomListView
 is 0x1d0 (0x3f680), CCBlockLayer 0x228 (0x460b0), CCScrollLayerExt 0x208
@@ -65,6 +65,15 @@ classification helper at 0x8cb70, including the current eight-character minimum,
 printable-character checks and common/pattern rejection. Fixtures verify guarded
 construction/destruction, delegate cleanup, native UI initialization, actual
 password feedback and short/common/control-character/heap-string cases.
+
+MusicChangelogEntry and SFXChangelogEntry reserve 0x50 bytes. Native library
+parsers inline their three integer values at 0x38/0x3c/0x40 and retain an entry
+array at 0x48. MusicChangelogLine reserves 0x60 bytes, with integer values at
+0x38/0x3c and a string at 0x40. The SDK exposes these values without assigning
+unverified header meanings. Factories, default construction and reinitialization
+preserve ownership; guarded fixtures also pass initialized SDK storage to native
+deleting destructors 0x480ca0/0x480d50/0x480d00 with deletion flags zero. They
+verify array release counts, heap-string cleanup and allocation boundaries.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
 particle draw-cost field puts the base size at 0x318; the additional tail
@@ -310,7 +319,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-175 checks cover native constructors, level/list cache fixtures, fresh/expired
+177 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore

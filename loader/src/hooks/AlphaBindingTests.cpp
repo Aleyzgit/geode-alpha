@@ -71,6 +71,8 @@
 #include <Geode/binding/LevelSettingsObject.hpp>
 #include <Geode/binding/LevelTools.hpp>
 #include <Geode/binding/MusicDownloadManager.hpp>
+#include <Geode/binding/MusicChangelogEntry.hpp>
+#include <Geode/binding/MusicChangelogLine.hpp>
 #include <Geode/binding/MusicBrowser.hpp>
 #include <Geode/binding/MusicSearchResult.hpp>
 #include <Geode/binding/MoreVideoOptionsLayer.hpp>
@@ -92,6 +94,7 @@
 #include <Geode/binding/ProfilePage.hpp>
 #include <Geode/binding/ReportQueuePopup.hpp>
 #include <Geode/binding/SFXBrowser.hpp>
+#include <Geode/binding/SFXChangelogEntry.hpp>
 #include <Geode/binding/SFXSearchResult.hpp>
 #include <Geode/binding/SFXFolderObject.hpp>
 #include <Geode/binding/SFXInfoObject.hpp>
@@ -3100,6 +3103,66 @@ $on_game(Loaded) {
             !control->m_slider && !control->m_label && !control->m_audioToggle;
         control->~TimeSpeedControl();
         return valid && std::all_of(storage.begin() + sizeof(TimeSpeedControl), storage.end(),
+            [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("SDK audio changelog records and reinitialization", [] {
+        auto check = []<class Entry>() {
+            if (sizeof(Entry) != 0x50 || offsetof(Entry, m_value1) != 0x38 ||
+                offsetof(Entry, m_value2) != 0x3c || offsetof(Entry, m_value3) != 0x40 ||
+                offsetof(Entry, m_entries) != 0x48) return false;
+            auto entry = std::make_unique<Entry>();
+            if (entry->m_value1 || entry->m_value2 || entry->m_value3 || entry->m_entries ||
+                !entry->init(7, -5, 13) || !entry->m_entries || entry->m_entries->count()) return false;
+            Ref<CCArray> previous = entry->m_entries;
+            auto before = previous->retainCount();
+            if (!entry->init(11, 17, 23) || previous->retainCount() + 1 != before ||
+                entry->m_value1 != 11 || entry->m_value2 != 17 || entry->m_value3 != 23 ||
+                !entry->m_entries || entry->m_entries == previous.data()) return false;
+            auto factory = Entry::create(29, 31, 37);
+            return factory && factory->m_value1 == 29 && factory->m_value2 == 31 &&
+                factory->m_value3 == 37 && factory->m_entries && !factory->m_entries->count();
+        };
+        if (!check.operator()<MusicChangelogEntry>() || !check.operator()<SFXChangelogEntry>()) return false;
+        auto line = MusicChangelogLine::create(41, std::string(128, 'a'), 43);
+        if (!line || sizeof(MusicChangelogLine) != 0x60 ||
+            offsetof(MusicChangelogLine, m_value) != 0x40 || line->m_value1 != 41 ||
+            line->m_value2 != 43 || line->m_value != std::string(128, 'a')) return false;
+        return line->init(47, "short", 53) && line->m_value1 == 47 && line->m_value2 == 53 &&
+            line->m_value == "short";
+    });
+
+    runBindingTest("SDK audio changelog storage through native destruction", [] {
+        auto check = []<class Entry>(uintptr_t address) {
+            if (sizeof(Entry) != 0x50 || offsetof(Entry, m_entries) != 0x48) return false;
+            alignas(Entry) std::array<uint8_t, sizeof(Entry) + 32> storage;
+            storage.fill(0xa5);
+            auto entry = new (storage.data()) Entry();
+            if (!entry->init(7, 11, 13)) {
+                entry->~Entry();
+                return false;
+            }
+            Ref<CCArray> values = entry->m_entries;
+            auto before = values->retainCount();
+            using FunctionType = void(*)(Entry*, unsigned int);
+            reinterpret_cast<FunctionType>(geode::base::get() + address)(entry, 0);
+            return values->retainCount() + 1 == before &&
+                std::all_of(storage.begin() + sizeof(Entry), storage.end(),
+                    [](uint8_t byte) { return byte == 0xa5; });
+        };
+        if (!check.operator()<MusicChangelogEntry>(0x480d50) ||
+            !check.operator()<SFXChangelogEntry>(0x480ca0)) return false;
+        if (sizeof(MusicChangelogLine) != 0x60 || offsetof(MusicChangelogLine, m_value) != 0x40) return false;
+        alignas(MusicChangelogLine) std::array<uint8_t, sizeof(MusicChangelogLine) + 32> storage;
+        storage.fill(0xa5);
+        auto line = new (storage.data()) MusicChangelogLine();
+        if (!line->init(17, std::string(128, 'b'), 19)) {
+            line->~MusicChangelogLine();
+            return false;
+        }
+        using FunctionType = void(*)(MusicChangelogLine*, unsigned int);
+        reinterpret_cast<FunctionType>(geode::base::get() + 0x480d00)(line, 0);
+        return std::all_of(storage.begin() + sizeof(MusicChangelogLine), storage.end(),
             [](uint8_t byte) { return byte == 0xa5; });
     });
 

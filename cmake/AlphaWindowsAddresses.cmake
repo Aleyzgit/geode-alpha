@@ -254,6 +254,28 @@ string(REPLACE "${alpha_sfx_folder_init}" "${alpha_sfx_folder_init}\n    m_folde
     alpha_sfx_folder_source "${alpha_sfx_folder_source}")
 file(WRITE "${alpha_sfx_folder_path}" "${alpha_sfx_folder_source}")
 
+# Library parsers inline construction of these records. Entries own an array
+# at 0x48; music lines own a string at 0x40 after two integer values.
+foreach(class IN ITEMS MusicChangelogEntry SFXChangelogEntry)
+    alpha_patch_class(GeometryDash "${class}" "    virtual ~${class}()"
+        "    ${class}() = win inline;\n    virtual ~${class}()")
+    alpha_patch_class(GeometryDash "${class}" "    static ${class}* create(int, int, int);"
+        "    static ${class}* create(int value1, int value2, int value3) = win inline;")
+    alpha_patch_class(GeometryDash "${class}" "    bool init(int, int, int);"
+        "    bool init(int value1, int value2, int value3) = win inline;\n\n    int m_value1;\n    int m_value2;\n    int m_value3;\n    cocos2d::CCArray* m_entries;")
+endforeach()
+alpha_patch_address(GeometryDash SFXChangelogEntry "~SFXChangelogEntry()" inline 0x480ca0)
+alpha_patch_address(GeometryDash MusicChangelogEntry "~MusicChangelogEntry()" inline 0x480d50)
+alpha_patch_class(GeometryDash MusicChangelogLine "    virtual ~MusicChangelogLine()"
+    "    MusicChangelogLine() = win inline;\n    virtual ~MusicChangelogLine()")
+alpha_patch_address(GeometryDash MusicChangelogLine "~MusicChangelogLine()" inline 0x480d00)
+alpha_patch_class(GeometryDash MusicChangelogLine "    static MusicChangelogLine* create(int, std::string, int);"
+    "    static MusicChangelogLine* create(int value1, std::string value, int value2) = win inline;")
+alpha_patch_class(GeometryDash MusicChangelogLine "    bool init(int, std::string, int);"
+    "    bool init(int value1, std::string value, int value2) = win inline;\n\n    int m_value1;\n    int m_value2;\n    std::string m_value;")
+file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/AudioChangelog.cpp" alpha_audio_changelog)
+file(WRITE "${alpha_bindings_output}/inline/AudioChangelog.cpp" "${alpha_audio_changelog}")
+
 # Native alert callbacks use this level deletion routine. Local editor levels
 # are removed from their own array; downloaded levels retain earned progress.
 alpha_patch_address(GeometryDash GameLevelManager

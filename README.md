@@ -103,7 +103,7 @@ the same build as the loader. Run the optional runtime checks with
 experimental version-check behavior. Report fork-specific issues to
 [Geode Alpha](https://github.com/Aleyzgit/geode-alpha/issues).
 
-Windows validation used Clang 21.1.8. The 175 runtime checks passed in both
+Windows validation used Clang 21.1.8. The 177 runtime checks passed in both
 compatibility modes, including manager cache fixtures, local list lookup,
 easing, dictionary merging, robot creation, lightning drawing and invalid PVR
 header rejection. Additional fixtures exercise native audio state and channels,
@@ -236,11 +236,14 @@ SFX metadata and folders reserve 0xb0/0xb8 bytes, including their extra strings.
 Native initialization builds the lowercase search cache; SDK folder creation
 sets the folder flag. Fixtures verify string/array lifetimes and SDK-created
 metadata through actual native SFX search.
+Music/SFX changelog records reserve their native 0x50 bytes and own their entry
+arrays. Music changelog lines reserve 0x60 bytes for two integers and a string.
+SDK factories and reinitialization are checked alongside native destruction.
 The SDK AppDelegate audio helpers preserve the legacy pause/resume policy.
 Fixtures cover loading, scene tags, pause, completion, death, missing players
 and menu-music preferences using isolated silent FMOD channels. Native gameplay
 checks independently confirm the player, start, completion and death offsets.
-All 5,901 populated generated wrappers point into executable
+All 5,898 populated generated wrappers point into executable
 sections of their respective tested modules; that audit does not prove their
 semantics. The native save path persisted a test
 value across game runs. Dark Windows Titlebar 1.0.1 was rebuilt from its
