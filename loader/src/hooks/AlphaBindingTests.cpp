@@ -1,4 +1,6 @@
 #include <Geode/binding/AchievementManager.hpp>
+#include <Geode/binding/AccountRegisterLayer.hpp>
+#include <Geode/binding/GJAccountManager.hpp>
 #include <Geode/binding/AppDelegate.hpp>
 #include <Geode/binding/BoomScrollLayer.hpp>
 #include <Geode/binding/BoomListView.hpp>
@@ -3099,6 +3101,50 @@ $on_game(Loaded) {
         control->~TimeSpeedControl();
         return valid && std::all_of(storage.begin() + sizeof(TimeSpeedControl), storage.end(),
             [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("SDK account registration allocation and ownership", [] {
+        if (sizeof(AccountRegisterLayer) != 0x310 ||
+            offsetof(AccountRegisterLayer, m_loadingCircle) != 0x300 ||
+            offsetof(AccountRegisterLayer, m_lockInput) != 0x308) return false;
+        alignas(AccountRegisterLayer) std::array<uint8_t, sizeof(AccountRegisterLayer) + 32> storage;
+        storage.fill(0xa5);
+        auto layer = new (storage.data()) AccountRegisterLayer();
+        bool valid = !layer->m_usernameField && !layer->m_passwordField && !layer->m_confirmPasswordField &&
+            !layer->m_emailField && !layer->m_verifyEmailField && !layer->m_usernameLabel &&
+            !layer->m_passwordLabel && !layer->m_passwordInfoLabel && !layer->m_confirmPasswordLabel && !layer->m_emailLabel &&
+            !layer->m_verifyEmailLabel && !layer->m_loadingCircle && !layer->m_lockInput;
+        auto manager = GJAccountManager::sharedState();
+        AlphaTestField delegate(manager->m_accountRegisterDelegate, static_cast<GJAccountRegisterDelegate*>(layer));
+        layer->~AccountRegisterLayer();
+        return valid && !manager->m_accountRegisterDelegate &&
+            std::all_of(storage.begin() + sizeof(AccountRegisterLayer), storage.end(),
+                [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native registration password feedback and validation", [] {
+        if (sizeof(AccountRegisterLayer) != 0x310 ||
+            offsetof(AccountRegisterLayer, m_passwordInfoLabel) != 0x2e0) return false;
+        auto manager = GJAccountManager::sharedState();
+        AlphaTestField delegate(manager->m_accountRegisterDelegate, manager->m_accountRegisterDelegate);
+        auto layer = std::make_unique<AccountRegisterLayer>();
+        if (!layer->init() || !layer->m_passwordField || !layer->m_passwordInfoLabel ||
+            !layer->m_confirmPasswordLabel || !layer->m_loadingCircle || layer->m_lockInput) return false;
+        layer->m_passwordField->setString("short");
+        layer->textChanged(layer->m_passwordField);
+        if (std::string(layer->m_passwordInfoLabel->getString()) != "Minimum 8 characters") return false;
+        layer->m_passwordField->setString("AlphaFixture7!");
+        layer->textChanged(layer->m_passwordField);
+        auto strength = std::string(layer->m_passwordInfoLabel->getString());
+        if (strength != "Strong") return false;
+        layer->updatePasswordInfo("AlphaFixture7!ABCD");
+        if (std::string(layer->m_passwordInfoLabel->getString()) != "Epic") return false;
+        layer->updatePasswordInfo("short");
+        if (std::string(layer->m_passwordInfoLabel->getString()) != "Minimum 8 characters") return false;
+        return !layer->validPassword("1234567") && !layer->validPassword("password") &&
+            !layer->validPassword("Alpha\tFixture7") && !layer->validPassword("Alpha\x7f" "Fixture7") &&
+            !layer->validPassword(std::string(128, 'a')) && layer->validPassword("AlphaFixture7!ABCD") &&
+            layer->validPassword("AlphaFixture7!ABCD" + std::string(128, 'a') + "Z9!");
     });
 
     runBindingTest("SDK slider snapping and native value helpers", [] {

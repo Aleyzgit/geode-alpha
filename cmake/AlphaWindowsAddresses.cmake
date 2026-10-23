@@ -47,6 +47,46 @@ function(alpha_patch_address file class signature address)
         "${signature} = win ${expected}" "${signature} = win ${address}")
 endfunction()
 
+# Native registration adds a password-strength label at 0x2e0. Its loading
+# circle and input lock follow at 0x300/0x308, within a 0x310-byte allocation.
+alpha_patch_class(GeometryDash AccountRegisterLayer
+    "    cocos2d::CCLabelBMFont* m_passwordLabel;"
+    "    cocos2d::CCLabelBMFont* m_passwordLabel;\n    cocos2d::CCLabelBMFont* m_passwordInfoLabel;")
+alpha_patch_address(GeometryDash AccountRegisterLayer
+    "void textChanged(CCTextInputNode* node)" 0x90140 inline)
+alpha_patch_class(GeometryDash AccountRegisterLayer
+    "    TodoReturn updatePasswordInfo(std::string);"
+    "    void updatePasswordInfo(std::string password) = win 0x8f9e0;")
+set(alpha_registration_inline "${alpha_bindings_output}/inline/AccountRegisterLayer.cpp")
+file(READ "${alpha_registration_inline}" alpha_registration_source)
+foreach(field IN ITEMS emailField passwordLabel emailLabel)
+    if (field STREQUAL "emailField")
+        set(extra "verifyEmailField")
+    elseif(field STREQUAL "passwordLabel")
+        set(extra "passwordInfoLabel")
+    else()
+        set(extra "verifyEmailLabel")
+    endif()
+    set(before "    m_${field} = nullptr;")
+    string(FIND "${alpha_registration_source}" "${before}" match)
+    if (match LESS 0)
+        message(FATAL_ERROR "Unexpected AccountRegisterLayer constructor field ${field}")
+    endif()
+    string(REPLACE "${before}" "${before}\n    m_${extra} = nullptr;"
+        alpha_registration_source "${alpha_registration_source}")
+endforeach()
+foreach(body IN ITEMS
+    "void AccountRegisterLayer::textChanged(CCTextInputNode* node) {}"
+    "bool AccountRegisterLayer::validPassword(std::string password) {\n    return password.size() > 5;\n}")
+    string(FIND "${alpha_registration_source}" "${body}" match)
+    if (match LESS 0)
+        message(FATAL_ERROR "Unexpected AccountRegisterLayer inline implementation")
+    endif()
+    string(REPLACE "${body}" "" alpha_registration_source "${alpha_registration_source}")
+endforeach()
+file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/AccountRegisterLayer.cpp" alpha_registration_helpers)
+file(WRITE "${alpha_registration_inline}" "${alpha_registration_source}\n${alpha_registration_helpers}")
+
 # Windows now resumes suspended audio in the engine. Preserve the older SDK
 # helpers using the verified legacy policy and the current typed game state.
 alpha_patch_address(GeometryDash AppDelegate "bool musicTest()" inline)
