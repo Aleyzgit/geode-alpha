@@ -87,6 +87,7 @@
 #include <Geode/binding/ProfilePage.hpp>
 #include <Geode/binding/ReportQueuePopup.hpp>
 #include <Geode/binding/SFXBrowser.hpp>
+#include <Geode/binding/SFXSearchResult.hpp>
 #include <Geode/binding/ShaderLayer.hpp>
 #include <Geode/binding/SecretRewardsLayer.hpp>
 #include <Geode/binding/SongInfoObject.hpp>
@@ -2772,6 +2773,77 @@ $on_game(Loaded) {
             }
             return affectedByPortals;
         });
+    });
+
+    runBindingTest("SDK SFX browser allocation", [] {
+        alignas(SFXBrowser) std::array<uint8_t, sizeof(SFXBrowser) + 32> storage;
+        storage.fill(0xa5);
+        auto browser = new (storage.data()) SFXBrowser;
+        auto valid = sizeof(SFXBrowser) == 0x468 && offsetof(SFXBrowser, m_folderPath) == 0x2f8 &&
+            offsetof(SFXBrowser, m_searchControls) == 0x368 && offsetof(SFXBrowser, m_circleSprite) == 0x438 &&
+            offsetof(SFXBrowser, m_sfxID) == 0x440 && offsetof(SFXBrowser, m_delegate) == 0x458 &&
+            !browser->m_searchResult && !browser->m_sfxObjects && browser->m_folderPath.empty() &&
+            !browser->m_searchControls && !browser->m_searchInput && !browser->m_delegate && !browser->m_autoUpdating;
+        auto search = SFXSearchResult::create(0);
+        auto objects = CCArray::create();
+        auto controls = CCArray::create();
+        search->retain();
+        objects->retain();
+        controls->retain();
+        browser->m_searchResult = search;
+        browser->m_sfxObjects = objects;
+        browser->m_searchControls = controls;
+        browser->m_folderPath = std::string(128, 'f');
+        browser->~SFXBrowser();
+        return valid && search->retainCount() == 1 && objects->retainCount() == 1 && controls->retainCount() == 1 &&
+            std::all_of(storage.begin() + sizeof(SFXBrowser), storage.end(),
+                [](uint8_t byte) { return byte == 0xa5; });
+    });
+
+    runBindingTest("Native SFX browser initialization and refresh", [] {
+        if (offsetof(MusicDownloadManager, m_sfxObjects) != 0x198 ||
+            offsetof(MusicDownloadManager, m_sfxArtists) != 0x1a0 ||
+            offsetof(MusicDownloadManager, m_sfxChangelog) != 0x1a8 ||
+            offsetof(MusicDownloadManager, m_sfxLibraryVersion) != 0x1b0 ||
+            offsetof(MusicDownloadManager, m_sfxObjectCount) != 0x1b4) return false;
+        auto manager = MusicDownloadManager::sharedState();
+        AlphaTestField downloads(manager->m_activeDownloads, CCDictionary::create());
+        AlphaTestField delegates(manager->m_musicDownloadDelegates, CCArray::create());
+        AlphaTestField objects(manager->m_sfxObjects, CCDictionary::create());
+        AlphaTestField artists(manager->m_sfxArtists, CCArray::create());
+        AlphaTestField requested(manager->m_requestedSfxLibraryDownloaded, true);
+        AlphaTestField count(manager->m_sfxObjectCount, 0);
+        AlphaTestField url(manager->m_customContentURL, std::string("https://alpha.invalid/"));
+        auto marker = CCNode::create();
+        for (auto key : {"v_sfx_l", "dl_sfx_l", "get_c_url"}) manager->m_activeDownloads->setObject(marker, key);
+        auto pool = CCPoolManager::sharedPoolManager();
+        pool->push();
+        auto pop = [](CCPoolManager* value) { value->pop(); };
+        std::unique_ptr<CCPoolManager, decltype(pop)> scope(pool, pop);
+        auto browser = SFXBrowser::create(0, 0);
+        if (!browser || browser->m_sfxID != 0 || !browser->m_searchResult || !browser->m_nameLabel ||
+            !browser->m_infoLabel || !browser->m_pageLabel || !browser->m_backButton || !browser->m_refreshButton ||
+            !browser->m_searchInput || !browser->m_searchControls || !browser->m_circleSprite) return false;
+        browser->m_sfxID = 717171;
+        if (browser->getSelectedCellIdx() != 717171) return false;
+        for (bool snap : {true, false}) {
+            browser->m_snapToSelected = snap;
+            if (browser->shouldSnapToSelected() != snap) return false;
+        }
+        browser->onUpdateLibrary(nullptr);
+        if (!browser->m_autoUpdating || browser->m_gettingURL) return false;
+        browser->onUpdateLibrary(marker);
+        if (browser->m_autoUpdating || browser->m_gettingURL) return false;
+        manager->m_customContentURL.clear();
+        browser->onUpdateLibrary(marker);
+        if (!browser->m_gettingURL || browser->m_autoUpdating) return false;
+        manager->m_customContentURL = "https://alpha.invalid/";
+        browser->cleanup();
+        auto sdkBrowser = std::make_unique<SFXBrowser>();
+        auto valid = sdkBrowser->init(0, 0) && sdkBrowser->m_searchResult && sdkBrowser->m_searchInput &&
+            sdkBrowser->m_searchControls && sdkBrowser->m_circleSprite;
+        sdkBrowser->cleanup();
+        return valid && manager->m_activeDownloads->count() == 3;
     });
 
     runBindingTest("SDK music browser allocation", [] {

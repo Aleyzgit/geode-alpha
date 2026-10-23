@@ -9,7 +9,7 @@ and engine SHA-256
 and interfaces on the pinned upstream declarations. It verifies each expected
 source declaration before patching the build copy, or accepts the exact same
 correction when upstream already contains it. Game and engine RVAs use their
-respective modules. The remaining 4 Windows address placeholders are in
+respective modules. The remaining 2 Windows address placeholders are in
 GeometryDash.bro; the engine declarations have no remaining Windows address
 placeholders. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
@@ -18,7 +18,7 @@ MoreOptionsLayer, have no usable Windows implementation in the current game.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `4a4044007192ae7fbbd72f0cd1e9f17094d9515b`. The generated Windows build has
-5,508 populated native wrappers, all pointing into executable sections of
+5,512 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
@@ -188,6 +188,22 @@ an SDK implementation, not a hookable native class or an old-DLL ABI bridge.
 A fixture checks both initial toggle states, real control activation, preserved
 heap-backed query text and delivery through SetTextPopupDelegate. Preferences
 are isolated and restored.
+SFXBrowser reserves 0x468 bytes. Construction/factory/init use
+0x616230/0x6166e0/0x616760; its scalar deleting destructor at 0x6164e0 receives
+deletion flags zero. The path string is at 0x2f8, search controls at 0x350
+through 0x370, loading circle at 0x438, selected SFX ID at 0x440 and delegate
+at 0x458. Known controls are typed; native selection containers and other
+unmapped state retain their allocation space and native ownership. The old
+search-label and cell-count fields have no corresponding Windows field.
+A guarded fixture checks path-string destruction and all three retained
+search/object/control arrays. Native and SDK browser fixtures exercise cached
+empty libraries, selection/snap getters and automatic/manual/missing-URL
+refresh through 0x618920, using isolated active requests.
+The same flow exposed incorrect download-manager SFX storage. The native
+parser writes its dictionary at 0x198, artist/changelog arrays at 0x1a0/0x1a8
+and version/object counters at 0x1b0/0x1b4. SDK fields now use those positions.
+Previously the fixture placed an array where native search expected a
+dictionary and reproduced a crash at 0x490be9. Both modes now complete cleanly.
 Buffered logger writes now use writeAll, since a single write may stop at the
 internal buffer boundary. Flush requests are retained in an atomic counter
 outside the cancellable notification future. A 64-KiB message fixture calls
@@ -239,7 +255,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-166 checks cover native constructors, level/list cache fixtures, fresh/expired
+168 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -374,7 +390,7 @@ pointer fields and paged-popup storage are used without duplicate padding.
 TabbedPopupLayer's Windows tail remains the verified 0x48 bytes.
 
 A separate compiled-size comparison covers all 548 upstream Windows references.
-It reports 130 differences requiring native verification; these are not a list
+It reports 129 differences requiring native verification; these are not a list
 of proven defects because some reference sizes are inconsistent with native
 construction. For example, GameManager's fields start before the reference's
 claimed GManager size. No automatic padding is applied from this comparison.

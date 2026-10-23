@@ -85,6 +85,82 @@ alpha_patch_address(GeometryDash SearchSFXPopup "void onSearchFolders(cocos2d::C
 file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/SearchSFXPopup.cpp" alpha_sfx_search_popup)
 file(APPEND "${alpha_bindings_output}/inline/SearchSFXPopup.cpp" "\n${alpha_sfx_search_popup}")
 
+# SFXBrowser owns new search controls, a path string and native selection
+# containers. Its native constructor/destructor initialize and release them.
+alpha_patch_class(GeometryDash SFXBrowser "SFXBrowser() = inline" "SFXBrowser() = win 0x616230")
+alpha_patch_address(GeometryDash SFXBrowser "~SFXBrowser()" 0x6164e0 inline)
+alpha_patch_address(GeometryDash SFXBrowser "static SFXBrowser* create(int, int)" 0x6166e0 inline)
+alpha_patch_address(GeometryDash SFXBrowser "bool init(int, int)" 0x616760)
+alpha_patch_address(GeometryDash SFXBrowser "void onUpdateLibrary(cocos2d::CCObject* sender)" 0x618920)
+alpha_patch_class(GeometryDash SFXBrowser [=[    SFXSearchResult* m_searchResult;
+    cocos2d::CCArray* m_sfxObjects;
+    GJCommentListLayer* m_listLayer;
+    cocos2d::CCLabelBMFont* m_nameLabel;
+    cocos2d::CCLabelBMFont* m_pathLabel;
+    cocos2d::CCLabelBMFont* m_infoLabel;
+    cocos2d::CCLabelBMFont* m_pageLabel;
+    cocos2d::CCLabelBMFont* m_searchLabel;
+    CCMenuItemSpriteExtra* m_prevButton;
+    CCMenuItemSpriteExtra* m_nextButton;
+    CCMenuItemSpriteExtra* m_backButton;
+    CCMenuItemSpriteExtra* m_refreshButton;
+    CCMenuItemSpriteExtra* m_clearSearchButton;
+    LoadingCircleSprite* m_circleSprite;
+    int m_sfxID;
+    int m_libraryVersion;
+    int m_cellAmount;
+    bool m_gettingURL;
+    bool m_selectedCell;
+    bool m_snapToSelected;
+    bool m_compactMode;
+    AudioSortType m_sortType;
+    SFXBrowserDelegate* m_delegate;
+    bool m_autoUpdating;]=]
+    [=[    SFXSearchResult* m_searchResult;
+    cocos2d::CCArray* m_sfxObjects;
+    GJCommentListLayer* m_listLayer;
+    cocos2d::CCLabelBMFont* m_nameLabel;
+    cocos2d::CCLabelBMFont* m_pathLabel;
+    CCMenuItemSpriteExtra* m_searchSettingsButton;
+    std::string m_folderPath;
+    cocos2d::CCLabelBMFont* m_infoLabel;
+    cocos2d::CCLabelBMFont* m_pageLabel;
+    CCMenuItemSpriteExtra* m_prevButton;
+    CCMenuItemSpriteExtra* m_nextButton;
+    CCMenuItemSpriteExtra* m_backButton;
+    CCMenuItemSpriteExtra* m_refreshButton;
+    CCMenuItemSpriteExtra* m_clearSearchButton;
+    CCTextInputNode* m_searchInput;
+    cocos2d::extension::CCScale9Sprite* m_searchBackground;
+    CCMenuItemSpriteExtra* m_clearSearchTextButton;
+    cocos2d::CCArray* m_searchControls;
+    bool m_searchVisible;
+    std::array<CCMenuItemSpriteExtra*, 4> m_viewButtons;
+    PAD = win 0x8;
+    CCMenuItemSpriteExtra* m_importSetupButton;
+    CCMenuItemSpriteExtra* m_replaceSetupButton;
+    CCMenuItemSpriteExtra* m_shareSetupButton;
+    PAD = win 0x8;
+    CCMenuItemSpriteExtra* m_exportFileButton;
+    CCMenuItemSpriteExtra* m_importFileButton;
+    CCMenuItemSpriteExtra* m_newFolderButton;
+    CCMenuItemSpriteExtra* m_moveToFolderButton;
+    CCMenuItemSpriteExtra* m_batchDeleteButton;
+    cocos2d::CCLabelBMFont* m_selectionLabel;
+    PAD = win 0x48;
+    LoadingCircleSprite* m_circleSprite;
+    int m_sfxID;
+    int m_libraryVersion;
+    AudioSortType m_sortType;
+    bool m_gettingURL;
+    bool m_selectedCell;
+    bool m_snapToSelected;
+    bool m_compactMode;
+    PAD = win 0x8;
+    SFXBrowserDelegate* m_delegate;
+    bool m_autoUpdating;]=])
+file(WRITE "${alpha_bindings_output}/inline/SFXBrowser.cpp" "")
+
 # Native alert callbacks use this level deletion routine. Local editor levels
 # are removed from their own array; downloaded levels retain earned progress.
 alpha_patch_address(GeometryDash GameLevelManager
@@ -964,12 +1040,15 @@ alpha_patch_class(GeometryDash SetTextPopup
     "void onClose(cocos2d::CCObject* sender);"
     "void onClose(cocos2d::CCObject* sender) = win 0x3a85a0;")
 
-# Native MusicDownloadManager allocates 0x3d0. New storage precedes the SFX
-# requested flag, the music-tag map and the music-library counters. Native
-# construction puts tag map at 0x1d8 and resource sets at 0x208 / 0x248.
+# Native MusicDownloadManager allocates 0x3d0. SFX parsing writes the object
+# dictionary at 0x198, artists/changelog arrays at 0x1a0/0x1a8 and counters
+# at 0x1b0/0x1b4. Preserve the native object preceding the dictionary.
 alpha_patch_class(GeometryDash MusicDownloadManager
-    "    bool m_requestedSfxLibraryDownloaded;"
-    "    PAD = win 0x10;\n    bool m_requestedSfxLibraryDownloaded;")
+    "    cocos2d::CCDictionary* m_sfxObjects;"
+    "    PAD = win 0x8;\n    cocos2d::CCDictionary* m_sfxObjects;")
+alpha_patch_class(GeometryDash MusicDownloadManager
+    "    cocos2d::CCArray* m_sfxArtists;"
+    "    cocos2d::CCArray* m_sfxArtists;\n    cocos2d::CCArray* m_sfxChangelog;")
 alpha_patch_class(GeometryDash MusicDownloadManager
     "    std::map<int, std::string> m_musicTags;"
     "    PAD = win 0x8;\n    std::map<int, std::string> m_musicTags;")
@@ -1210,6 +1289,7 @@ if (WIN32)
     alpha_patch_deleting_destructor(PauseLayer 0x4d6600)
     alpha_patch_deleting_destructor(TimeSpeedControl 0x47080 PRESERVE_INLINE)
     alpha_patch_deleting_destructor(MusicBrowser 0x479ee0)
+    alpha_patch_deleting_destructor(SFXBrowser 0x6164e0)
 endif()
 
 # Options factories allocate 0x78 and 0x300. The native row reads its count at
