@@ -403,11 +403,19 @@ alpha_patch_class(GeometryDash LevelSettingsObject "    bool m_enableImpulseFix;
     std::string m_unk1e8;
     std::unordered_map<int, std::unordered_map<int, std::string>> m_idNames;
     std::unordered_map<int, std::vector<int>> m_idUseOrder;
-    std::map<int, std::string> m_unk288;
+    std::map<std::pair<int, int>, std::string> m_customSFXPaths;
     std::string m_unk298;
     int m_unk2b8;
     std::set<int> m_unk2c0;
     int m_unk2d0;]=])
+alpha_patch_class(GeometryDash LevelSettingsObject "    TodoReturn getIDName(int, int);"
+    "    std::string getIDName(int id, int type) = win 0x40d8a0;")
+alpha_patch_class(GeometryDash LevelSettingsObject "    TodoReturn sanitizeIDName(std::string const&);"
+    "    static std::string sanitizeIDName(std::string const& value) = win 0x40c300;")
+alpha_patch_class(GeometryDash LevelSettingsObject "    void setIDName(int, std::string const&, int);"
+    "    void setIDName(int id, std::string const& value, int type) = win 0x40da20;")
+alpha_patch_class(GeometryDash LevelSettingsObject "    TodoReturn getCustomSFXPathRaw(int, int);"
+    "    std::string getCustomSFXPathRaw(int id, int slot) = win 0x40d2d0;")
 file(READ "${CMAKE_CURRENT_LIST_DIR}/alpha-inline/LevelSettingsObject.cpp" alpha_level_settings_factory)
 file(APPEND "${alpha_bindings_output}/inline/LevelSettingsObject.cpp" "\n${alpha_level_settings_factory}")
 # GameManager::recountUserStats inlines this 43-level set in Windows 2.2091.

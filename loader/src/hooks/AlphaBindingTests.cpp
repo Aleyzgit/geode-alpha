@@ -3111,14 +3111,14 @@ $on_game(Loaded) {
         if (sizeof(LevelSettingsObject) != 0x2d8 || offsetof(LevelSettingsObject, m_unk1e8) != 0x1e8 ||
             offsetof(LevelSettingsObject, m_idNames) != 0x208 ||
             offsetof(LevelSettingsObject, m_idUseOrder) != 0x248 ||
-            offsetof(LevelSettingsObject, m_unk288) != 0x288 ||
+            offsetof(LevelSettingsObject, m_customSFXPaths) != 0x288 ||
             offsetof(LevelSettingsObject, m_unk298) != 0x298 ||
             offsetof(LevelSettingsObject, m_unk2c0) != 0x2c0) return false;
         alignas(LevelSettingsObject) std::array<uint8_t, sizeof(LevelSettingsObject) + 32> storage;
         storage.fill(0xa5);
         auto settings = new (storage.data()) LevelSettingsObject();
         bool valid = !settings->m_effectManager && settings->m_unk1e8.empty() &&
-            settings->m_idNames.empty() && settings->m_idUseOrder.empty() && settings->m_unk288.empty() &&
+            settings->m_idNames.empty() && settings->m_idUseOrder.empty() && settings->m_customSFXPaths.empty() &&
             settings->m_unk298.empty() && settings->m_unk2c0.empty() && !settings->m_unk2b8 && !settings->m_unk2d0;
         if (valid) {
             settings->m_guidelineString.assign(128, 'a');
@@ -3126,7 +3126,7 @@ $on_game(Loaded) {
             settings->m_idNames[7][11] = std::string(128, 'c');
             settings->m_idNames[13][17] = std::string(128, 'd');
             settings->m_idUseOrder[7] = {11, 13, 17};
-            settings->m_unk288.emplace(19, std::string(128, 'e'));
+            settings->m_customSFXPaths.emplace(std::pair{7, 19}, std::string(128, 'e'));
             settings->m_unk298.assign(128, 'f');
             settings->m_unk2c0.insert(23);
             settings->m_unk2c0.insert(29);
@@ -3162,6 +3162,49 @@ $on_game(Loaded) {
             restored->m_songOffset == 1.25f && restored->m_backgroundIndex == 2 &&
             restored->m_groundIndex == 3 && restored->m_fontIndex == 4 &&
             restored->m_guidelineString == settings->m_guidelineString;
+    });
+
+    runBindingTest("Native level ID names and sanitized updates", [] {
+        auto settings = LevelSettingsObject::create();
+        if (!settings) return false;
+        constexpr int type = 1;
+        constexpr int id = 17;
+        if (!settings->getIDName(id, type).empty()) return false;
+        std::string raw = "  Alpha, Fixture!_1.  ";
+        auto clean = LevelSettingsObject::sanitizeIDName(raw);
+        if (clean.empty() || clean.find(',') != std::string::npos || clean.find('!') != std::string::npos) return false;
+        settings->setIDName(id, raw, type);
+        if (settings->m_idNames[type][id] != clean || settings->getIDName(id, type) != clean ||
+            !settings->getIDName(id, type + 1).empty()) return false;
+        settings->m_idUseOrder[type] = {id, 19};
+        settings->setIDName(id, "", type);
+        if (settings->m_idNames[type].contains(id) || !settings->getIDName(id, type).empty() ||
+            settings->m_idUseOrder[type] != std::vector<int>{19}) return false;
+        settings->setIDName(id, "Alpha Name", type);
+        settings->setIDName(19, "Second Name", type);
+        settings->m_idUseOrder[type] = {id, 19};
+        auto restored = LevelSettingsObject::objectFromString(settings->getSaveString());
+        return restored && restored->getIDName(id, type) == "Alpha Name" &&
+            restored->getIDName(19, type) == "Second Name" &&
+            restored->m_idUseOrder[type] == settings->m_idUseOrder[type];
+    });
+
+    runBindingTest("Native custom SFX paths use paired identifiers", [] {
+        if (offsetof(LevelSettingsObject, m_customSFXPaths) != 0x288) return false;
+        auto settings = LevelSettingsObject::create();
+        if (!settings || !settings->getCustomSFXPathRaw(11, 7).empty()) return false;
+        std::string path = "alpha-fixture/" + std::string(128, 'a') + ".ogg";
+        settings->m_customSFXPaths[{7, 11}] = path;
+        settings->m_customSFXPaths[{7, 13}] = "other.ogg";
+        settings->m_customSFXPaths[{11, 7}] = "swapped.ogg";
+        if (settings->getCustomSFXPathRaw(11, 7) != path ||
+            settings->getCustomSFXPathRaw(13, 7) != "other.ogg" ||
+            settings->getCustomSFXPathRaw(7, 11) != "swapped.ogg" ||
+            !settings->getCustomSFXPathRaw(11, 8).empty()) return false;
+        auto restored = LevelSettingsObject::objectFromString(settings->getSaveString());
+        return restored && restored->getCustomSFXPathRaw(11, 7) == path &&
+            restored->getCustomSFXPathRaw(13, 7) == "other.ogg" &&
+            restored->getCustomSFXPathRaw(7, 11) == "swapped.ogg";
     });
 
     runBindingTest("SDK comment lifetime and native score ownership", [] {

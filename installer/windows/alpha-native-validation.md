@@ -48,8 +48,8 @@ A guarded fixture tests these defaults and actual raw/snapped/rounded values.
 The native options popup's list type is also checked against BoomListType.
 
 A separate read-only pass extracted sized-delete arguments from native primary
-RTTI tables for 537 classes. It found 88 confirmed SDK size differences; 11
-classes could not be evaluated by that method. Four published size references
+RTTI tables for 547 classes. It found 92 confirmed SDK size differences; one
+class, GlobalKeybindSource, could not be evaluated by that method. Four published size references
 disagree with both the current SDK and native deleting destructors: BoomListView
 is 0x1d0 (0x3f680), CCBlockLayer 0x228 (0x460b0), CCScrollLayerExt 0x208
 (0x4ad40), and GManager 0x168 (0x5a200). These reference errors do not justify
@@ -85,7 +85,7 @@ and the native deleting destructor at 0x218e70 with flags zero.
 
 LevelSettingsObject reserves 0x2d8 bytes and uses native construction at 0x3ecac0.
 The added storage includes a string at 0x1e8, nested integer/string name tables
-at 0x208, integer/vector order tables at 0x248, an integer/string tree at 0x288,
+at 0x208, integer/vector order tables at 0x248, a paired-integer/string tree at 0x288,
 a string at 0x298 and an integer set at 0x2c0. Native allocation and container-node
 destruction establish these layouts. The deleting destructor at 0x3ecd40 receives
 flags zero through the SDK helper; constructor cleanup retains the usual Geode
@@ -93,6 +93,14 @@ destructor-lock protocol. Guarded fixtures fill the nested containers and heap
 strings before native cleanup and verify effect-manager ownership. The SDK
 factory uses the real initializer, and native save/parse roundtrips preserve
 mode, speed, dual/two-player settings, song offset, indices and guidelines.
+Native ID-name lookup at 0x40d8a0 and updates at 0x40da20 use the typed name
+tables. The static sanitizer at 0x40c300 filters unsupported characters; clearing
+a name removes its usage-order entry. Fixtures check native lookup, sanitized
+updates, removal and persistence of two named IDs in their usage order.
+Custom SFX path lookup at 0x40d2d0 uses a pair of slot and ID integers at tree-node
+offsets 0x20/0x24, followed by the string at 0x28. Using an integer alone had the
+same allocation geometry but the wrong key semantics. Fixtures distinguish
+swapped keys, multiple IDs, missing paths and save/parse persistence.
 
 The Windows engine allocates 0x348 bytes for CCParticleSystemQuad. The new
 particle draw-cost field puts the base size at 0x318; the additional tail
@@ -338,7 +346,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-181 checks cover native constructors, level/list cache fixtures, fresh/expired
+183 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -473,7 +481,7 @@ pointer fields and paged-popup storage are used without duplicate padding.
 TabbedPopupLayer's Windows tail remains the verified 0x48 bytes.
 
 A separate compiled-size comparison covers all 548 upstream Windows references.
-It reports 127 differences requiring native verification; these are not a list
+It reports 96 differences requiring native verification; these are not a list
 of proven defects because some reference sizes are inconsistent with native
 construction. For example, GameManager's fields start before the reference's
 claimed GManager size. No automatic padding is applied from this comparison.

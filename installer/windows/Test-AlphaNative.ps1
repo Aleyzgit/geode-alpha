@@ -162,6 +162,8 @@ $expected = @(
     'SDK comment lifetime and native score ownership',
     'SDK level settings allocation and container lifetimes',
     'SDK level settings factory and native save roundtrip',
+    'Native level ID names and sanitized updates',
+    'Native custom SFX paths use paired identifiers',
     'Native comment dictionary fields and SDK factory',
     'Native registration password feedback and validation',
     'Native pause construction boundary and ownership',
