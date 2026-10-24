@@ -14,6 +14,10 @@ Windows native-address placeholders. The older AppDelegate audio APIs use SDK
 compatibility helpers. This count does not establish completeness of class layouts or
 SDK implementations. Some removed native Windows classes, including
 MoreOptionsLayer, have no usable Windows implementation in the current game.
+Builds compile Codegen from the pinned binding source by default. A newer rolling
+Codegen binary had generated includes for mapping headers absent from that source.
+Direct dependencies also make wrapper parameter types and inline search helpers
+independent of their unity compilation order.
 Release installers also require the verified-port state in
 `cmake/AlphaReleaseReadiness.cmake`. The actual NSIS guard rejects both missing
 addresses and a port with zero placeholders whose layout/compatibility checks
@@ -35,7 +39,7 @@ the separate flag at 0x3955 is not the completion field used by this policy.
 The integrated upstream v6 revision is
 `fed6cfb` and the bindings revision is
 `2853bd1fc276870bdfcb3846ff467291e85ad6ec`. The generated Windows build has
-5,898 populated native wrappers, all pointing into executable sections of
+5,904 populated native wrappers, all pointing into executable sections of
 their respective tested modules. That range audit does not verify semantics.
 
 Bindings revision 2853bd1 adds named editor-window, option, score and audio
@@ -48,13 +52,23 @@ A guarded fixture tests these defaults and actual raw/snapped/rounded values.
 The native options popup's list type is also checked against BoomListType.
 
 A separate read-only pass extracted sized-delete arguments from native primary
-RTTI tables for 547 classes. It found 92 confirmed SDK size differences; one
+RTTI tables for 547 classes. It found 91 confirmed SDK size differences; one
 class, GlobalKeybindSource, could not be evaluated by that method. Four published size references
 disagree with both the current SDK and native deleting destructors: BoomListView
 is 0x1d0 (0x3f680), CCBlockLayer 0x228 (0x460b0), CCScrollLayerExt 0x208
 (0x4ad40), and GManager 0x168 (0x5a200). These reference errors do not justify
 padding those classes. Size checks do not prove member layout or ABI behavior,
 and the remaining confirmed differences keep release readiness incomplete.
+
+GJKeybindManager reserves 0xe0 bytes. Its bidirectional hash/set indices occupy
+0x38/0x78, movement-override trees 0xb8/0xc8 and active flag 0xd8. Native binding
+at 0x388ed0 populates both indices; apply/clear at 0x388f40/0x3896b0 temporarily
+replace movement chords and restore the prior values. SDK construction matches
+the engine's stateless keyboard-action base constructor and false-returning
+global-action handler. Its deleting destructor receives flags zero explicitly.
+Guarded SDK/native cleanup fixtures fill all four containers and restore the
+singleton pointer that the native destructor clears. Further fixtures verify
+duplicates, actual overrides, repeated clearing and unrelated bindings.
 
 AccountRegisterLayer reserves 0x310 bytes, with password feedback at 0x2e0,
 the retained loading circle at 0x300 and the input lock at 0x308. SDK construction
@@ -346,7 +360,7 @@ Use a separate game copy with matching loader resources and run:
 ```
 
 The script runs strict and explicitly experimental compatibility modes. Its
-183 checks cover native constructors, level/list cache fixtures, fresh/expired
+185 checks cover native constructors, level/list cache fixtures, fresh/expired
 timers, easing, integer merges, robot creation, lightning drawing and properties,
 invalid PVR header rejection, settings, version gates and asynchronous saving.
 It requires normal shutdown and rejects new crash reports. Tests restore
@@ -481,7 +495,7 @@ pointer fields and paged-popup storage are used without duplicate padding.
 TabbedPopupLayer's Windows tail remains the verified 0x48 bytes.
 
 A separate compiled-size comparison covers all 548 upstream Windows references.
-It reports 96 differences requiring native verification; these are not a list
+It reports 95 differences requiring native verification; these are not a list
 of proven defects because some reference sizes are inconsistent with native
 construction. For example, GameManager's fields start before the reference's
 claimed GManager size. No automatic padding is applied from this comparison.

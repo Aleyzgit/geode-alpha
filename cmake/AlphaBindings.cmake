@@ -28,6 +28,12 @@ if (NOT GEODE_BINDINGS_PATH)
         "int getIntGameVariable(char const* key) = win 0x27ec70;"
         alpha_bindings "${alpha_bindings}")
 
+    # Wrapper metadata needs complete parameter types even for references.
+    string(REPLACE
+        "TimerTriggerAction)]]\nclass GJEffectManager"
+        "TimerTriggerAction, EffectManagerState)]]\nclass GJEffectManager"
+        alpha_bindings "${alpha_bindings}")
+
     file(CONFIGURE OUTPUT "${alpha_bindings_output}/GeometryDash.bro"
         CONTENT "${alpha_bindings}" @ONLY)
     include("${CMAKE_CURRENT_LIST_DIR}/AlphaInlineDependencies.cmake")
@@ -37,7 +43,7 @@ if (NOT GEODE_BINDINGS_PATH)
     file(READ "${GEODE_BINDINGS_REPO_PATH}/bindings/include/Geode/Enums.hpp" alpha_enums)
     # Generated state headers use arrays, maps and cocos value types without
     # direct includes. Keep them valid independently of unity source ordering.
-    set(alpha_enums "#include <array>\n#include <map>\n#include <Geode/cocos/include/ccTypes.h>\n${alpha_enums}")
+    set(alpha_enums "#include <array>\n#include <map>\n#include <set>\n#include <Geode/cocos/include/ccTypes.h>\n${alpha_enums}")
     set(alpha_song_types "enum class GJSongType {\n    Music = -1,\n    NCS = 1,\n};")
     string(FIND "${alpha_enums}" "${alpha_song_types}" alpha_song_types_match)
     if (alpha_song_types_match LESS 0)

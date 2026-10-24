@@ -91,6 +91,8 @@ $expected = @(
     'Native button background sizing',
     'Native upload popup factory',
     'Native local key bindings',
+    'Native keybind manager allocation',
+    'Native movement binding override and restoration',
     'Native global key lookup dispatch',
     'Native editor window base',
     'Native scroll base ownership',

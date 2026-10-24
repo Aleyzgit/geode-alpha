@@ -1958,6 +1958,77 @@ $on_game(Loaded) {
             base->chordsForAction(717171).empty();
     });
 
+    runBindingTest("Native keybind manager allocation", [] {
+        if (sizeof(GJKeybindManager) != 0xe0 || offsetof(GJKeybindManager, m_chordActions) != 0x38 ||
+            offsetof(GJKeybindManager, m_actionChords) != 0x78 ||
+            offsetof(GJKeybindManager, m_savedMovementBindings) != 0xb8 ||
+            offsetof(GJKeybindManager, m_overrideBindings) != 0xc8 ||
+            offsetof(GJKeybindManager, m_hasMovementOverride) != 0xd8) return false;
+        auto singleton = GJKeybindManager::sharedState();
+        auto& singletonStorage = *reinterpret_cast<GJKeybindManager**>(geode::base::get() + 0x90c000);
+        if (singletonStorage != singleton) return false;
+        auto check = [&](bool native) {
+            alignas(GJKeybindManager) std::array<uint8_t, sizeof(GJKeybindManager) + 32> storage;
+            storage.fill(0xa5);
+            auto manager = new (storage.data()) GJKeybindManager();
+            bool valid = !manager->m_hasMovementOverride && manager->m_chordActions.empty() &&
+                manager->m_actionChords.empty() && manager->m_savedMovementBindings.empty() &&
+                manager->m_overrideBindings.empty() && manager->retainCount() == 1 &&
+                !manager->CCKeyboardActionManager::handleGlobalAction(717171, false) &&
+                !manager->CCKeyboardActionManager::handleGlobalAction(717171, true);
+            manager->bindChord(7, 42);
+            manager->bindChord(9, 42);
+            manager->bindChord(7, 43);
+            manager->bindChord(7, 42);
+            valid = valid && manager->chordsForAction(42) == std::vector<int>{7, 9} &&
+                manager->actionsForChord(7) == std::vector<int>{42, 43} &&
+                manager->m_chordActions[7] == std::set<int>{42, 43} &&
+                manager->m_actionChords[42] == std::set<int>{7, 9} &&
+                manager->chordsForAction(717171).empty();
+            manager->m_savedMovementBindings[42] = {7, 9};
+            manager->m_overrideBindings[7] = {42, 43};
+            if (native) {
+                using FunctionType = void(*)(GJKeybindManager*, unsigned int);
+                reinterpret_cast<FunctionType>(geode::base::get() + 0x388420)(manager, 0);
+            }
+            else {
+                manager->~GJKeybindManager();
+            }
+            // Both native and SDK destruction clear the singleton, including
+            // for this isolated fixture. Restore it before other checks run.
+            singletonStorage = singleton;
+            return valid && std::all_of(storage.begin() + sizeof(GJKeybindManager), storage.end(),
+                [](uint8_t byte) { return byte == 0xa5; });
+        };
+        return check(false) && check(true);
+    });
+
+    runBindingTest("Native movement binding override and restoration", [] {
+        auto singleton = GJKeybindManager::sharedState();
+        auto& singletonStorage = *reinterpret_cast<GJKeybindManager**>(geode::base::get() + 0x90c000);
+        if (singletonStorage != singleton) return false;
+        struct RestoreSingleton {
+            GJKeybindManager*& storage;
+            GJKeybindManager* value;
+            ~RestoreSingleton() { storage = value; }
+        } restore {singletonStorage, singleton};
+        auto manager = std::make_unique<GJKeybindManager>();
+        auto source = std::make_unique<KeybindSet>();
+        manager->bindChord(7, 10001);
+        manager->bindChord(11, 717171);
+        source->bindChord(9, 10001);
+        manager->applyMovementOverride(source.get(), nullptr);
+        bool valid = manager->m_hasMovementOverride &&
+            manager->chordsForAction(10001) == std::vector<int>{9} &&
+            manager->chordsForAction(717171) == std::vector<int>{11};
+        manager->clearMovementOverride();
+        manager->clearMovementOverride();
+        return valid && !manager->m_hasMovementOverride && manager->m_savedMovementBindings.empty() &&
+            manager->chordsForAction(10001) == std::vector<int>{7} &&
+            manager->actionsForChord(9).empty() &&
+            manager->chordsForAction(717171) == std::vector<int>{11};
+    });
+
     runBindingTest("Native global key lookup dispatch", [] {
         GlobalKeybindSource source(geode::ZeroConstructor);
         KeybindSource* base = &source;

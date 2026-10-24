@@ -16,6 +16,7 @@ class CC_DLL CCKeyboardActionManager : public CCObject
 public:
     GEODE_CUSTOM_CONSTRUCTOR_COCOS(CCKeyboardActionManager, CCObject)
 #ifdef GEODE_IS_WINDOWS
+    CCKeyboardActionManager();
     // Native Windows vtable: key lookup at 0x48, global actions at 0x50.
     virtual std::vector<int> actionsForKey(enumKeyCodes, bool, bool, bool) = 0;
 #endif

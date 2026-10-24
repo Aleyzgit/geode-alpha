@@ -345,6 +345,11 @@ endif()
 target_sources(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/entry.cpp)
 
 include(cmake/AlphaBindings.cmake)
+# Build the generator from the same revision as the bindings. The rolling
+# binary can require mapping headers absent from this pinned SDK checkout.
+if (NOT DEFINED SKIP_BUILDING_CODEGEN)
+    set(SKIP_BUILDING_CODEGEN OFF)
+endif()
 add_subdirectory(${GEODE_BINDINGS_REPO_PATH} ${CMAKE_BINARY_DIR}/bindings)
 if (GEODE_ALPHA_ENUMS_INCLUDE)
 	target_include_directories(GeodeBindings BEFORE PUBLIC ${GEODE_ALPHA_ENUMS_INCLUDE})

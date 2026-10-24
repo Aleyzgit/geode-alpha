@@ -15,6 +15,7 @@ endfunction()
 
 if (WIN32)
     alpha_include_inline(GJLevelList Geode/binding/GJGameLevel.hpp)
+    alpha_include_inline(LevelSearchLayer Geode/binding/GameLevelManager.hpp)
     alpha_include_inline(LevelSelectLayer
         Geode/binding/GameManager.hpp Geode/binding/LevelPage.hpp algorithm)
     alpha_include_inline(CreatorLayer

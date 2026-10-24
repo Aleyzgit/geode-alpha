@@ -1117,6 +1117,32 @@ if (WIN32)
     alpha_patch_class(GeometryDash GJKeybindManager
         "    TodoReturn actionsForChord(int);"
         "    std::vector<int> actionsForChord(int) = win 0x388920;")
+    # Native allocation is 0xe0: bidirectional hash/set indices, two movement
+    # override trees and an active flag. Container nodes own their integer sets.
+    alpha_patch_class(GeometryDash GJKeybindManager
+        "    virtual ~GJKeybindManager()"
+        "    GJKeybindManager() = win inline;\n    virtual ~GJKeybindManager()")
+    alpha_patch_class(GeometryDash GJKeybindManager
+        "    TodoReturn bindChord(int, int);"
+        "    void bindChord(int chord, int action) = win 0x388ed0;")
+    alpha_patch_class(GeometryDash GJKeybindManager
+        "    TodoReturn applyMovementOverride(KeybindSource*, KeybindSource*);"
+        "    void applyMovementOverride(KeybindSource* primary, KeybindSource* secondary) = win 0x388f40;")
+    alpha_patch_class(GeometryDash GJKeybindManager
+        "    TodoReturn clearMovementOverride();"
+        "    void clearMovementOverride() = win 0x3896b0;")
+    alpha_patch_class(GeometryDash GJKeybindManager
+        "    TodoReturn unbindChord(int, int);"
+        [=[    TodoReturn unbindChord(int, int);
+
+    std::unordered_map<int, std::set<int>> m_chordActions;
+    std::unordered_map<int, std::set<int>> m_actionChords;
+    std::map<int, std::set<int>> m_savedMovementBindings;
+    std::map<int, std::set<int>> m_overrideBindings;
+    bool m_hasMovementOverride;
+]=])
+    file(CONFIGURE OUTPUT "${alpha_bindings_output}/inline/GJKeybindManager.cpp"
+        CONTENT "#include <Geode/binding/GJKeybindManager.hpp>\n\nGJKeybindManager::GJKeybindManager() : m_hasMovementOverride(false) {}\n" @ONLY)
 endif()
 
 # Native editor window base allocates 0x480, initializes 0x3e8..0x478 and
@@ -1433,6 +1459,7 @@ if (WIN32)
     alpha_patch_deleting_destructor(SFXBrowser 0x6164e0)
     alpha_patch_deleting_destructor(SFXInfoObject 0x480bc0)
     alpha_patch_deleting_destructor(LevelSettingsObject 0x3ecd40)
+    alpha_patch_deleting_destructor(GJKeybindManager 0x388420 PRESERVE_INLINE)
 endif()
 
 # Options factories allocate 0x78 and 0x300. The native row reads its count at
